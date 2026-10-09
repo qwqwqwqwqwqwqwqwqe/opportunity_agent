@@ -34,6 +34,14 @@ V1 继续保留，部分画像、规划逻辑由 V2 复用；**V1 的 `data/conv
 
 按当前代码更新参考图：主控制流不是 LangGraph / ReAct 自主循环；默认 Docker 配置使用 openJiuwen **Python A2A**。下图可在 GitHub 直接渲染。
 
+### V2.2 设计参考图
+
+![V2.2 多智能体架构设计参考图](docs/assets/v2-2-reference-architecture.png)
+
+上图是设计参考，包含尚未实现或已调整的内容：情景记忆、逐 token 输出、Router 的框架形态和部分存储描述不能作为现有能力证明。实际控制流、权限及更新时机以下面的代码架构图和“当前缺陷”章节为准。
+
+### 当前代码架构图
+
 ```mermaid
 flowchart TB
     U[用户 / 浏览器] <-->|HTTP + SSE| API[FastAPI · 鉴权 / REST / 执行事件]
@@ -285,6 +293,7 @@ GET /api/v1/runs/{run_id}/events
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,v2,resume]"
+$env:DOMAIN_AGENT_TRANSPORT = "local" # 离线单测；Docker 中仍使用 a2a
 python -m pytest tests/test_v2_full_chain.py tests/test_v2_memory.py tests/test_v2_synthesis_cache.py -q
 ```
 
@@ -292,7 +301,103 @@ python -m pytest tests/test_v2_full_chain.py tests/test_v2_memory.py tests/test_
 
 测试方法与诊断入口见 [Research 文档](docs/research_agent.md) 和 [合成容错与缓存说明](docs/synthesis_cache_reliability.md)。本地历史报告不随本次文档提交发布，也不代表当前 checkout 的实时测试结果；真实双查询验收曾因模型网关认证失败而未完成。
 
-## 当前边界与后续验收
+## 人工审核网站：复核 LLM 预标注
+
+这是**离线检索评测的证据标注工具**，不是聊天前端的画像审批页，也不是在线回答评估 Agent。实现位于 `v2/evaluation/research_annotation.py`、`research_llm_export.py`、`research_llm_review.py` 和 `research_llm_review.html`。
+
+### 启动
+
+在项目根目录使用独立 Python 环境；服务不在默认 Compose 中启动：
+
+```powershell
+python -m pip install -e ".[dev,v2]"
+python -m opportunity_agent.v2.evaluation.research_dataset serve --dir deliverables/research/real150 --host 127.0.0.1 --port 8765
+```
+
+- [原人工标注网站](http://127.0.0.1:8765/)：Program / Query / Source / Fact / Gold / Evidence / Answer 审核。
+- [LLM 预标注复核网站](http://127.0.0.1:8765/llm)：导入机器标签、人工接受或修订、导出结果。
+
+仓库保留了 `draft.json`、`candidate-pool.json`、`review-queue.json`。本地审核状态 `annotations.sqlite`、LLM 任务包、结果和快照不提交；首次克隆不能假定已有人工进度。**已有标注时先备份整个目录，不要为了打开网站重新采集或重建候选池。**
+
+### 准备与导入机器标签
+
+如果已有配套的任务包及完整结果，直接导入即可；没有任务包时先执行：
+
+```powershell
+python -m opportunity_agent.v2.evaluation.research_dataset export-llm --dir deliverables/research/real150 --batch-size 10
+python -m opportunity_agent.v2.evaluation.research_dataset llm-batch --dir deliverables/research/real150
+```
+
+`export-llm` 生成 `llm-evidence-review.json`，**不调用模型**。将展开批次的 `system_prompt`、`input` 和 `output_schema` 交给模型逐批预标注，按完整结果契约汇总为 `llm-evidence-review-results.json`；单批回复不能冒充完整结果文件。原文发送给外部模型前应自行确认数据授权。
+
+在 `/llm` 选择完整结果文件，点击“导入完整 LLM 结果”；也可执行：
+
+```powershell
+python -m opportunity_agent.v2.evaluation.research_dataset import-llm --dir deliverables/research/real150 --input "D:/your-results/llm-evidence-review-results.json"
+```
+
+导入检查输入 hash、全部批次、ID、统计值及逐字引用。任务包必须与当前草稿、候选池配套；不匹配时不要手改 hash 绕过。机器结果只保存为提案和 SHA256 快照，不自动获得人工标签，也不覆盖原人工记录。完整契约见 [Research 文档](docs/research_agent.md#导出-llm-证据预标注包)。
+
+### 如何复核与导出
+
+1. 填写真实标注者标识；选择“全部等级 2”“需要人工复核”“无正例 Top5”“随机 0/1”或“全部重点”筛选。
+2. 对照问题、要求支持的事实、片段原文及来源，检查项目、适用周期和来源可靠性；不要只看 LLM 理由。
+3. 内部等级 **0=无关、1=背景相关、2=直接支持**，键盘快捷键分别为 **1 / 2 / 3**。等级 2 必须选择支持的事实，填写当前片段中的逐字引用。
+4. 完全认可机器结果时点“原样接受 LLM 标签”；修改表单后点“保存当前人工修订”。快捷键只改等级，不自动保存。“修改上一条”可返回修订。
+5. 覆盖既有人工意见必须明确勾选确认，历史仍保留；`needs_human_review=false` 不代表已经人工审核。
+6. 用页面按钮分别导出人工标签、原机器标签、人工优先混合数据；命令行混合导出如下。
+
+```powershell
+python -m opportunity_agent.v2.evaluation.research_dataset export-reviewed --dir deliverables/research/real150
+python -m opportunity_agent.v2.evaluation.research_dataset validate --dir deliverables/research/real150
+# 仅在正式审核和一致性检查全部完成后导出 gold
+python -m opportunity_agent.v2.evaluation.research_dataset export --dir deliverables/research/real150
+```
+
+`export-reviewed` 默认生成 `llm-reviewed-merged.json`，不会覆盖 `gold.json`。混合结果标记为 `llm_assisted_not_human_gold`，**不等同于纯人工 gold**；正式导出仍需满足来源／事实／问题等审核、双人标注和分歧裁决要求。没有等级 2 也不能直接认定问题无答案。
+
+审核站仅允许 loopback 启动，但没有独立登录、Host / Origin 校验或上传大小上限；不要通过公网隧道、反向代理对外开放，也不要用于多人生产协作。
+
+## 当前缺陷与安全检查
+
+以下为 **2026-10-09** 对当前代码的检查，不是完整渗透测试或质量认证。详细证据与检查范围见 [代码与安全审查记录](docs/code-review-20261009.md)。
+
+本次针对性离线回归 **114 passed / 1 skipped**，覆盖审核站、预标注、鉴权、记忆、合成缓存和路由；离线运行需显式 `DOMAIN_AGENT_TRANSPORT=local`，跳过项需独立 PostgreSQL 测试连接。没有把该结果当成真实模型或 RAG 质量验收。
+
+| 优先级 | 当前问题 | 影响 / 下一步 |
+|---|---|---|
+| P1 · 公开部署前 | 默认开发数据库口令、API 监听所有网卡；登录没有限流，Run 无用户级队列配额 | 保持本机演示；上线前补 HTTPS、安全 Cookie、强密钥检查、限流与成本配额 |
+| P1 · 信任边界 | A2A 未配置服务间身份验证；stdio MCP 工具接受调用方 `user_id`；审核站没有独立鉴权 | A2A 留在可信内网，MCP 仅受信宿主使用；远程化前绑定调用身份，审核站增加访问保护 |
+| P1 · 上下文 | Router 启发式判断独立查询后清空历史；需要历史时仅取最后 6 条 | 多轮年份、项目及约束可能丢失；实现带来源的 Context Resolver，当前明确条件优先 |
+| P1 · 诊断 / 修复 | Run 异常路径没有保存完整中间结果；无新增证据时可重复相似补查 | 保存脱敏阶段快照，显示 MCP 拒绝原因；增加无进展检测和策略切换 |
+| P1 · 业务能力 | 年度总预算未成为完整成功标准与费用核验条件；偏好识别范围有限 | 通用候选、澄清与能力检查；无法预算筛选时明确告知，不作已筛选承诺 |
+| P2 · 资源 / 恢复 | 同步模型调用取消后仍可能等待线程；SSE 长连接持有 DB session；Run 使用固定租约 | 验证负载、取消、连接池压力及恢复；增加心跳、断线游标和并发预算 |
+| P2 · 测试配置 | 部分基础单测未显式注入领域执行器，默认会尝试 A2A | 离线回归设置 `DOMAIN_AGENT_TRANSPORT=local`；后续消除环境依赖，不把单测误当真实 A2A 验收 |
+| P2 · 记忆时机 | PASS 后即使合成降级也可能提交归纳任务 | 显式记录合成结果，严格区分模型成功与兜底，不改变已经返回的事实 |
+| P2 · 检索质量 | RAG 人工校准及独立 test 质量未完成，待审核字段不能作为可靠 SQL 结果 | 完成人工 gold，再验收检索与引用；不能用 Checker PASS 或合成数据高分代替 |
+
+### GitHub 密钥检查
+
+扫描了远程 `origin/main` 的全部可达历史：**2 次提交、254 个唯一文件版本**，以及当时的 253 个跟踪文件；同时比对本地配置中 3 个非占位凭据的原值，**未发现匹配的真实凭据**。只报告位置与类型，没有输出密钥。两处启发式命中已核实为文档占位符和测试字符串。
+
+`.env`、私钥、运行会话与标注数据库未被跟踪；但仓库明确含有**公开的开发数据库口令和测试密钥**，不能用于真实部署。本次是规则与原值比对，不覆盖未知格式密钥、其他远程分支、GitHub Actions 日志、Release / Issue 附件或平台缓存。建议后续启用 GitHub Secret Scanning / Push Protection，并在 CI 加入 Gitleaks 等扫描；发现泄漏应先撤销／轮换，再处理历史，不能只删除当前文件。
+
+## 后续开发与测试计划
+
+| 顺序 | 开发交付 | 验收方式 |
+|---|---|---|
+| 1 | Context Resolver 与结构化活动任务状态；替代简单整条 pin，保留当前实体和字段 | 年份继承、换话题、六校澄清列表、多轮纠正、历史注入与跨用户隔离回归 |
+| 2 | 通用偏好候选与澄清；预算能力边界和费用结构化事实 | 漏识别、不明确币种／范围、临时覆盖、假设不写入；数据齐备后才验收费率、年度总费用和未知值处理 |
+| 3 | 检索诊断与有效定向修复；失败快照、无进展停止 | “5 个首轮 4 个”、无效补查、错误周期、来源拒绝、MCP 超时；确认旧结果保留且不无限重跑 |
+| 4 | 记忆归纳严格终态门槛及运行可靠性 | 合成成功／降级／失败、提交失败、过时审批、重复 outbox、租约恢复与并发写入 |
+| 5 | 上线安全基线与负载控制 | 限流、队列配额、弱密钥拒绝、服务身份、防越权、审核站 Host / Origin / 上传限制、日志脱敏和依赖扫描 |
+| 6 | 真实模型、浏览器与最新 Docker 验收 | 隔离账号下 40 条人工审阅输入，每条 3 次；路由目标 ≥95%，契约与安全用例全部通过；浏览器单独记录 |
+| 7 | 人工 gold 检索与答案质量评测 | dev 校准、test 验收 Precision@5 / Recall@5 / MRR、候选召回、无答案表现和引用支持；缺标注时记录未验收 |
+| 8 | 逐 token 回复 | 带序号 `answer_delta`、断线去重、草稿提示及最终权威答案替换；先完成前述可靠性验收 |
+
+以上是未来计划，不表示本次已修复业务代码。第一层交付功能回归，第二层交付真实链路，第三层交付人工质量验收，分别记录。
+
+## 其他边界
 
 - 已实现偏好读写、归纳提案和审批；不自动将学校事实、规划建议、执行经验保存为用户长期记忆。
 - 预算偏好不代表已支持可靠的年度总费用硬过滤；费用范围、币种、生活费等需单独补齐、验收。
@@ -304,7 +409,55 @@ python -m pytest tests/test_v2_full_chain.py tests/test_v2_memory.py tests/test_
 - 人工 gold 完成后单独验收 Precision@5、Recall@5、MRR、无答案表现和引用支持；真实模型、浏览器及部署需分层验收。
 - 外部模型、工具可能接收请求内容，不要在公开演示账号输入敏感资料。Research A2A 请求不携带完整画像或会话原文。
 
-## 代码导航
+## 代码目录结构
+
+以下省略缓存、虚拟环境和本地运行数据；标注“V1”的模块用于兼容或被 V2 复用，并非新主控制流。
+
+```text
+opportunity_agent/                  # 项目根目录
+├── README.md                       # V2 入口、运行与能力边界
+├── opportunity_agent/              # Python 包
+│   ├── v2/                         # V2 主实现
+│   │   ├── api/                    # FastAPI、鉴权依赖、Run / SSE / 审批接口
+│   │   ├── web/                    # V2 登录、聊天、画像、偏好和规划前端
+│   │   ├── agents/                 # Agent 契约与控制面
+│   │   │   ├── orchestrator.py     # Goal Parser、Router、Checker、补查与 Synthesizer
+│   │   │   ├── a2a.py              # openJiuwen A2A 客户端和领域服务入口
+│   │   │   ├── contracts.py        # ExecutionState / RouteDecision / Agent 结果类型
+│   │   │   ├── result_aggregation.py # 结果合并、去重及变更提案汇总
+│   │   │   ├── profile_agent.py    # 画像、申请状态与偏好候选
+│   │   │   ├── research_agent.py   # Research 领域执行入口
+│   │   │   └── planning_agent.py   # 申请规划与时间线草稿
+│   │   ├── research/               # Query Router、SQL 目录、MCP 官网核验与事实缓存
+│   │   ├── rag/                    # E5 / pgvector / 全文 / RRF / BGE 重排
+│   │   ├── services/               # 会话上下文、偏好记忆、归纳、审批与冲突处理
+│   │   ├── db/                     # SQLAlchemy 模型、数据库连接
+│   │   ├── core/                   # 配置、密码 / JWT、OpenTelemetry
+│   │   ├── mcp/                    # 本系统对外提供的 stdio MCP 工具（不是 Tavily 客户端）
+│   │   ├── evaluation/             # 离线评测、数据集、人工标注与 LLM 预标注复核站
+│   │   ├── repositories.py         # 持久化、幂等、Run 领取及事件序号
+│   │   ├── schemas.py              # HTTP 请求 / 响应模型
+│   │   ├── worker.py               # Redis 摄取和 PostgreSQL 记忆 outbox 消费
+│   │   └── migration.py            # V1 数据迁移工具，当前暂不执行
+│   ├── skills/                     # 规划文章等领域提示词与约束
+│   ├── llm_client.py               # 共用模型传输、结构化输出、重试与诊断
+│   ├── llm_context.py              # 会话上下文注入与隔离
+│   ├── web_app.py / opportunity_a2a.py # V1 Web 与本机领域服务
+│   └── profile.py / planning.py / … # V1 画像、规划、进展等可复用领域逻辑
+├── alembic/                        # 数据库增量迁移，不改写已执行历史
+├── scripts/                        # 本地启动、GPU 环境及真实链路验收工具
+├── tools/                          # 画像抽取评测数据生成等辅助脚本
+├── tests/                          # 离线、接口、A2A、前端模拟和数据库回归
+├── docs/                           # 专题说明、审查记录与架构源图
+│   └── assets/                     # README 使用的静态图片
+├── deliverables/research/real150/   # 冻结官网草稿 / 候选池 / 审核队列
+├── data/university_domains.json    # 维护的学校官方域名注册表
+├── docker-compose*.yml             # 基础服务及 CPU / GPU 检索 overlay
+├── Dockerfile*                     # 基础、CPU 与 GPU 镜像
+└── pyproject.toml                  # 包配置、依赖与 pytest 入口
+```
+
+### 重点文件导航
 
 | 目录 / 文件 | 用途 |
 |---|---|
