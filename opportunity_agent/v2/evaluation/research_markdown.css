@@ -1,0 +1,14 @@
+.chunk-reader{border:1px solid #dce3ef;border-radius:12px;overflow:hidden;margin:20px 0;background:#fff}
+.chunk-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 20px;background:#eef4fb;border-bottom:1px solid #dce3ef}
+.chunk-toolbar span,.md-muted{font-size:13px;color:#66758c}.chunk-markdown{padding:22px 26px;font:16px/1.85 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:#243247;overflow-wrap:anywhere}
+.chunk-markdown p{margin:0 0 16px}.chunk-markdown h2,.chunk-markdown h3,.chunk-markdown h4{line-height:1.45;margin:24px 0 12px;color:#17365a}.chunk-markdown>:first-child{margin-top:0}
+.chunk-markdown ul,.chunk-markdown ol{padding-left:28px;margin:12px 0 18px}.chunk-markdown li{margin:6px 0}
+.chunk-markdown a{color:#1769aa;text-decoration:none}.chunk-markdown a:hover{text-decoration:underline}
+.chunk-markdown code{padding:2px 5px;border-radius:4px;background:#f0f3f8;font-size:.9em}.chunk-markdown .md-code{background:#f4f6fa;padding:16px;white-space:pre-wrap;border-radius:8px;max-height:none}.md-code code{padding:0}
+.chunk-markdown blockquote{border-left:4px solid #8aabd4;background:#f5f8fc;margin:16px 0;padding:12px 18px;color:#53647a}
+.md-table-scroll{overflow-x:auto;border:1px solid #dce3ef;border-radius:8px;margin:16px 0}.chunk-markdown table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}
+.chunk-markdown th,.chunk-markdown td{text-align:left;padding:11px 14px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;min-width:90px;vertical-align:top}
+.chunk-markdown th{background:#eaf1f9;color:#234568;font-weight:650}.chunk-markdown tbody tr:nth-child(even){background:#f8fafc}.chunk-markdown tbody tr:hover{background:#eef5ff}
+.chunk-markdown td:last-child,.chunk-markdown th:last-child{border-right:0}.chunk-markdown tr:last-child td{border-bottom:0}.md-caption{margin-top:-8px!important}
+.chunk-original{border-top:1px solid #dce3ef;padding:12px 20px;background:#fafbfd}.chunk-original summary{cursor:pointer;color:#365a82;font-size:14px}.chunk-original pre{font:13px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:500px;padding:14px;background:#f0f3f8;border-radius:6px}
+@media(max-width:700px){.chunk-markdown{padding:16px}.chunk-toolbar{align-items:flex-start;flex-direction:column}.chunk-markdown td,.chunk-markdown th{padding:8px}}

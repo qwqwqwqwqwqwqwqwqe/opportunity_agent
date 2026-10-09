@@ -1,0 +1,11 @@
+FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY pyproject.toml README.md ./
+COPY opportunity_agent/__init__.py ./opportunity_agent/__init__.py
+RUN python -m pip install --no-cache-dir --upgrade pip && python -m pip install --no-cache-dir ".[v2,resume,rag,observability]"
+COPY opportunity_agent ./opportunity_agent
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
+COPY data/university_domains.json ./data/university_domains.json
+CMD ["python", "-m", "opportunity_agent.v2.agents.a2a", "research", "--host", "0.0.0.0", "--advertised-host", "research", "--backend", "python"]

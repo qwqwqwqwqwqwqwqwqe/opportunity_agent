@@ -1,0 +1,109 @@
+[
+  {
+    "id": "greeting",
+    "message": "你好，今天怎么样？",
+    "mode": "direct_reply",
+    "agents": [],
+    "criteria": null
+  },
+  {
+    "id": "thanks",
+    "message": "谢谢你的帮助！",
+    "mode": "direct_reply",
+    "agents": [],
+    "criteria": null
+  },
+  {
+    "id": "emotional_support",
+    "message": "我最近申请压力很大，有点焦虑。",
+    "mode": "direct_reply",
+    "agents": [],
+    "criteria": null
+  },
+  {
+    "id": "profile_score",
+    "message": "我的托福考了105分，请更新我的背景。",
+    "mode": "delegate",
+    "agents": ["profile"],
+    "criteria": null
+  },
+  {
+    "id": "research_deadline",
+    "message": "请查询 CMU MSCS 2026-12-01 之后的截止日期，并给出官网来源。",
+    "mode": "delegate",
+    "agents": ["research"],
+    "criteria": {
+      "deadline_after": "2026-12-01",
+      "evidence_required": true
+    }
+  },
+  {
+    "id": "research_chinese_count_and_gre",
+    "message": "帮我找五个不要求 GRE 的计算机项目，要有官方链接。",
+    "mode": "delegate",
+    "agents": ["research"],
+    "criteria": {
+      "required_program_count": 5,
+      "gre_policy": "not_required",
+      "evidence_required": true
+    }
+  },
+  {
+    "id": "research_english_count",
+    "message": "Find 3 programs with GRE optional and official sources.",
+    "mode": "delegate",
+    "agents": ["research"],
+    "criteria": {
+      "required_program_count": 3,
+      "gre_policy": "not_required",
+      "evidence_required": true
+    }
+  },
+  {
+    "id": "ambiguous_month_deadline",
+    "message": "找三个截止日期在12月以后、不要求 GRE 的项目。",
+    "mode": "delegate",
+    "agents": ["research"],
+    "criteria": {
+      "required_program_count": 3,
+      "gre_policy": "not_required",
+      "needs_user_input": true
+    }
+  },
+  {
+    "id": "planning",
+    "message": "请为 2027 Fall 申请制定时间线和准备计划。",
+    "mode": "delegate",
+    "agents": ["planning"],
+    "criteria": null
+  },
+  {
+    "id": "profile_research_mixed",
+    "message": "我的 GPA 是 3.7，帮我推荐五个不要求 GRE 的项目并附官网。",
+    "mode": "delegate",
+    "agents": ["profile", "research"],
+    "criteria": {
+      "required_program_count": 5,
+      "gre_policy": "not_required"
+    }
+  },
+  {
+    "id": "research_planning_mixed",
+    "message": "找三个 GRE 可选项目，并给我安排申请时间线。",
+    "mode": "delegate",
+    "agents": ["research", "planning"],
+    "criteria": {
+      "required_program_count": 3,
+      "gre_policy": "not_required"
+    }
+  },
+  {
+    "id": "preference_then_research",
+    "message": "我不考虑 GRE 项目了，帮我找五个符合条件的学校。",
+    "mode": "delegate",
+    "agents": ["profile", "research"],
+    "criteria": {
+      "required_program_count": 5
+    }
+  }
+]

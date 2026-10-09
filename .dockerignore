@@ -1,0 +1,16 @@
+# The API/worker image only needs package source plus packaging metadata.
+# Keeping the context narrow avoids uploading local databases, test artifacts,
+# generated deliverables, and unrelated repository files on every build.
+*
+!Dockerfile
+!Dockerfile.research
+!Dockerfile.research.cpu
+!pyproject.toml
+!README.md
+!opportunity_agent/
+!opportunity_agent/**
+!alembic.ini
+!alembic/
+!alembic/**
+!data/
+!data/university_domains.json

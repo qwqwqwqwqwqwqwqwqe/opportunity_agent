@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>LLM 预标注复核</title>
+<style>body{font:16px system-ui;max-width:1100px;margin:24px auto;background:#f6f8fb;color:#172033}section{background:white;padding:20px;margin:15px 0;border-radius:10px}button,input,select,textarea{padding:8px;margin:5px}pre{white-space:pre-wrap;max-height:420px;overflow:auto}.muted{color:#607086}.warn{color:#a24000}label{display:inline-block}textarea{width:95%}</style>
+<link rel="stylesheet" href="/annotation-assets/markdown.css"><script src="/annotation-assets/markdown.js"></script>
+<h1>LLM 预标注人工复核</h1><a href="/">返回原审核界面</a>
+<section><input type="file" id="upload" accept=".json"><button onclick="importFile()">导入完整 LLM 结果</button><p>导入只保存机器预标注，不覆盖人工标签。原文件按 SHA256 保存为不可覆盖快照。</p><div id="message"></div></section>
+<section><label>标注者<input id="annotator" value="annotator-1"></label>
+<label>筛选<select id="filter"><option value="positive">① 全部等级 2</option><option value="flagged">② 需要人工复核</option><option value="no_positive_top5">③ 无正例 RAG/背景匹配 Top5</option><option value="random">④ 随机 0/1</option><option value="priority">全部重点（去重排序）</option><option value="all">全部证据</option></select></label>
+<label>随机样本数<input id="sample" type="number" value="100" min="0" max="2000" style="width:70px"></label><label>种子<input id="seed" type="number" value="20261007" style="width:100px"></label>
+<button onclick="load()">加载</button><button onclick="previous()">修改上一条</button><p id="progress"></p>
+<button onclick="download('human')">导出人工标签</button><button onclick="download('machine')">导出原始机器标签</button><button onclick="download('merged')">导出人工优先混合数据</button><p class="warn">混合数据不是纯人工 gold；无正例不等于无答案，不能直接当作正式评测金标准。</p></section>
+<section id="content">请先导入结果或点击加载。</section>
+<script>
+let state=null;const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const params=()=>new URLSearchParams({filter:filter.value,sample_size:sample.value,seed:seed.value});
+const key=()=>`llm-review:last:${state?.import_id}:${annotator.value.trim()}`;
+async function api(url,options){let r=await fetch(url,options),text=await r.text(),v;try{v=JSON.parse(text)}catch(e){throw Error(`HTTP ${r.status}：服务返回了非JSON响应。请检查服务终端报错。${text.slice(0,160)}`)}if(!r.ok)throw Error(v.detail||JSON.stringify(v));return v}
+async function importFile(){try{if(!upload.files[0])throw Error('请选择 JSON 文件');let raw=await upload.files[0].text();let v=await api('/api/llm/import',{method:'POST',headers:{'content-type':'application/json'},body:raw});message.textContent=`已导入 ${v.pairs} 对；快照 ${v.import_id}`;await load()}catch(e){message.textContent=e.message}}
+async function load(extra=''){try{state=await api('/api/llm/next?'+params()+extra);progress.textContent=`本筛选已审核 ${state.completed}/${state.total}；各类总数 ${JSON.stringify(state.filter_counts)}`;render()}catch(e){content.textContent=e.message}}
+function render(){if(state.done){content.innerHTML='<h2>此筛选没有待复核项</h2><p>已有人工作出的有效标签会自动跳过。可切换下一类。</p>';return}let c=state.case,d=state.document,p=state.proposal,s=state.saved_review||state.existing_human||p;
+let safe=/^https:\/\//i.test(d.url)?d.url:'';
+content.innerHTML=`<h2>${esc(c.query)}</h2><p>${esc(c.id)} · ${esc(c.category)} · ${esc(state.tags.join(', '))}</p><h3>${esc(d.title)}</h3><a target="_blank" rel="noopener noreferrer" href="${esc(safe)}">${esc(d.url)}</a><p class="muted">章节：${esc(d.section_path||'页面正文')} · 抓取时间：${esc(d.source_context.retrieved_at)} · 年度范围：${esc(d.source_context.temporal_scope)}</p>${ChunkMarkdown.card(d.text)}
+<details open><summary>LLM 原始预标注（不变）</summary><pre>${esc(JSON.stringify(p,null,2))}</pre></details>
+${state.existing_human||state.existing_conflict?`<p class="warn">已有人工标签或冲突：不会自动覆盖；只有明确确认并提交才采用本次修订。</p><pre>${esc(JSON.stringify(state.existing_human||'多名标注者意见冲突',null,2))}</pre><label><input id="override" type="checkbox">确认本次复核用于修订既有标签（原记录仍保留）</label>`:''}
+<h3>人工确认／修改</h3><label>等级<select id="grade"><option value="0">0 无关（快捷键1）</option><option value="1">1 背景相关（快捷键2）</option><option value="2">2 直接支持（快捷键3）</option></select></label>
+<label>项目<select id="pm"><option value="exact">匹配</option><option value="rejected">不匹配</option><option value="uncertain">不确定</option></select></label>
+<label>入学季<select id="im"><option value="yes">匹配</option><option value="no">冲突</option><option value="unknown">未知</option></select></label>
+<label>来源<select id="sr"><option value="yes">可靠</option><option value="no">不可靠</option><option value="unknown">未知</option></select></label>
+<div id="claims">${c.required_claims.map(x=>`<label><input type="checkbox" value="${esc(x)}">${esc(x)}</label><br>`).join('')}</div>
+<p>引用 JSON（等级2，每条格式 {"claim_id":"…","quote":"逐字原文"}；0/1 自动清空）</p><textarea id="quotes" rows="5"></textarea>
+<p>判断理由</p><textarea id="reason" rows="2"></textarea><label><input id="needs" type="checkbox">年度／适用性仍需进一步核验</label>
+<p>人工备注</p><textarea id="notes" rows="2"></textarea><button onclick="save('accept')">原样接受 LLM 标签</button><button onclick="save('modify')">保存当前人工修订</button>`;
+grade.value=s.relevance??0;pm.value=s.program_match;im.value=s.intake_match;sr.value=s.source_reliable;needs.checked=s.needs_human_review;quotes.value=JSON.stringify(s.supporting_quotes||[],null,2);reason.value=s.reason||'';notes.value=s.review_notes||'';
+document.querySelectorAll('#claims input').forEach(x=>x.checked=(s.supports_claims||[]).includes(x.value))}
+async function save(action){try{if(!annotator.value.trim())throw Error('请填写标注者');let n=Number(grade.value);let j={chunk_id:state.proposal.chunk_id,relevance:n,supports_claims:n===2?[...document.querySelectorAll('#claims input:checked')].map(x=>x.value):[],supporting_quotes:n===2?JSON.parse(quotes.value):[],program_match:pm.value,intake_match:im.value,source_reliable:sr.value,needs_human_review:needs.checked,reason:reason.value,label_origin:'llm_proposed'};
+await api('/api/llm/review',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({import_id:state.import_id,case_id:state.case.id,chunk_id:j.chunk_id,annotator:annotator.value,action,judgment:j,notes:notes.value,confirm_existing_override:document.getElementById('override')?.checked||false})});localStorage.setItem(key(),JSON.stringify({case_id:state.case.id,chunk_id:j.chunk_id}));await load()}catch(e){alert(e.message)}}
+async function previous(){try{if(!state)throw Error('请先加载');let saved=JSON.parse(localStorage.getItem(key())||'null');if(!saved)throw Error('没有上一个审核项');await load('&'+new URLSearchParams(saved))}catch(e){alert(e.message)}}
+async function download(kind){try{let v=await api('/api/llm/export?kind='+kind+(state?'&import_id='+state.import_id:''));let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(v,null,2)],{type:'application/json'}));a.download=`llm-reviewed-${kind}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){alert(e.message)}}
+document.addEventListener('keydown',e=>{if(!state||state.done||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(['1','2','3'].includes(e.key)){grade.value=Number(e.key)-1;e.preventDefault()}});
+load();
+</script></html>

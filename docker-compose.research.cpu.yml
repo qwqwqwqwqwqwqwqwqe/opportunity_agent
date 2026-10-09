@@ -1,0 +1,35 @@
+# Use with docker-compose.yml; do not combine with the GPU overlay.
+services:
+  research:
+    build:
+      context: .
+      dockerfile: Dockerfile.research.cpu
+      args:
+        TORCH_CPU_INDEX_URL: ${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    environment:
+      EMBEDDING_DEVICE: cpu
+      RERANKER_DEVICE: cpu
+      RERANKER_ENABLED: "1"
+      RERANKER_BATCH_SIZE: "4"
+      RESEARCH_WARMUP: "1"
+      RESEARCH_ALLOW_MODEL_DOWNLOAD: "1"
+      RESEARCH_CALIBRATION_FILE: /research-artifacts/calibration.json
+    volumes:
+      - research_models:/root/.cache/huggingface
+      - ./deliverables/research:/research-artifacts
+    healthcheck:
+      start_period: 1800s
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.research.cpu
+      args:
+        TORCH_CPU_INDEX_URL: ${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    environment:
+      EMBEDDING_DEVICE: cpu
+      RERANKER_DEVICE: cpu
+      RESEARCH_ALLOW_MODEL_DOWNLOAD: "1"
+    volumes:
+      - research_models:/root/.cache/huggingface
+volumes:
+  research_models:

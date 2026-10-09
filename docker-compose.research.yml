@@ -1,0 +1,65 @@
+# Optional GPU and OTLP overlay. Enable after testing CUDA visibility in Docker.
+services:
+  api:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: opportunity-api
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+  profile:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: opportunity-profile
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+  planning:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: opportunity-planning
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.research
+    environment:
+      EMBEDDING_DEVICE: cpu
+      RESEARCH_ALLOW_MODEL_DOWNLOAD: "1"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: opportunity-worker
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    volumes:
+      - research_models:/root/.cache/huggingface
+  research:
+    build:
+      context: .
+      dockerfile: Dockerfile.research
+    environment:
+      RERANKER_ENABLED: "1"
+      RESEARCH_WARMUP: "1"
+      RERANKER_DEVICE: cuda
+      RERANKER_BATCH_SIZE: "4"
+      RESEARCH_ALLOW_MODEL_DOWNLOAD: "1"
+      RESEARCH_CALIBRATION_FILE: /research-artifacts/calibration.json
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: opportunity-research
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    healthcheck:
+      start_period: 1800s
+    volumes:
+      - research_models:/root/.cache/huggingface
+      - ./deliverables/research:/research-artifacts
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.21.0
+    ports: ["127.0.0.1:16686:16686", "127.0.0.1:4318:4318"]
+volumes:
+  research_models:

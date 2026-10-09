@@ -1,0 +1,52 @@
+# Local secrets and generated runtime/test artifacts
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+conversation-api-*/
+conversation-store-*/
+.resume_tmp/
+data/resume_imports.json
+data/resume_imports.tmp
+.venv-research/
+deliverables/research/*.db
+deliverables/research/pytest-*/
+deliverables/research/real150/*.db
+deliverables/research/real150/*.sqlite*
+
+# Local environments and generated files
+.venv/
+venv/
+*.egg-info/
+/.audit-*/
+/.pytest-*/
+/.llm-review-test-*/
+/.test-*/
+/.tmp-*/
+/a2a-test-temp/
+/logs/
+/.claude/
+/ppt_build/
+/opportunity_agent/deliverables/
+
+# Private local state; only the maintained domain registry is versioned
+/data/*
+!/data/university_domains.json
+
+# Local research runs and reports; retain reproducible evaluation inputs
+/deliverables/*
+!/deliverables/research/
+/deliverables/research/*
+!/deliverables/research/dataset.json
+!/deliverables/research/real150/
+/deliverables/research/real150/*
+!/deliverables/research/real150/draft.json
+!/deliverables/research/real150/candidate-pool.json
+!/deliverables/research/real150/review-queue.json
+
+# Additional local secrets
+.env.*
+!.env.example
+*.pem
+*.key

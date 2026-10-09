@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Opportunity Agent V2</title>
+  <link rel="stylesheet" href="/v2/assets/style.css">
+</head>
+<body>
+  <div id="auth" class="auth-shell">
+    <form id="auth-form" class="auth-card">
+      <div class="brand">✦ Opportunity Agent <small>V2</small></div>
+      <h1 id="auth-title">登录</h1>
+      <label>邮箱<input id="email" type="email" required autocomplete="email"></label>
+      <label>密码<input id="password" type="password" required minlength="10" autocomplete="current-password"></label>
+      <p id="auth-error" class="error" role="alert"></p>
+      <button class="primary" type="submit">继续</button>
+      <button id="auth-mode" class="link-button" type="button">没有账户？注册</button>
+    </form>
+  </div>
+
+  <div id="app" class="app-shell" hidden>
+    <aside class="left-panel">
+      <div class="brand">✦ Opportunity Agent <small>V2</small></div>
+      <button id="new-conversation" class="primary">＋ 新对话</button>
+      <nav id="conversations" aria-label="对话列表"></nav>
+      <div class="account"><span id="account-email"></span><button id="logout" class="link-button">退出</button></div>
+    </aside>
+
+    <main class="chat-panel">
+      <header><button class="mobile-panel" data-panel="left">☰</button><div><strong id="conversation-title">新对话</strong><small id="run-status">准备就绪</small></div><button class="mobile-panel" data-panel="right">资料</button></header>
+      <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="run-steps" class="run-steps" aria-live="polite"></div>
+        <div id="run-info" class="hint" aria-live="polite"></div>
+      <form id="chat-form" class="composer"><textarea id="chat-input" rows="2" placeholder="说说你的背景、申请进展，或让助手生成计划…" required></textarea><button class="primary" type="submit">发送</button></form>
+    </main>
+
+    <aside class="right-panel">
+      <div class="tabs" role="tablist"><button data-tab="profile" class="active">画像</button><button data-tab="plan">计划</button><button data-tab="memory">偏好</button><button data-tab="approvals">待确认 <span id="approval-count"></span></button></div>
+      <section id="profile-view" class="side-content"></section>
+      <section id="plan-view" class="side-content" hidden></section>
+      <section id="memory-view" class="side-content" hidden></section>
+      <section id="approvals-view" class="side-content" hidden></section>
+    </aside>
+  </div>
+
+  <dialog id="profile-dialog"><form id="profile-form"><h2>编辑画像</h2><div id="profile-fields" class="field-grid"></div><p class="hint">保存后请在待确认中审阅变更。</p><div class="dialog-actions"><button type="button" id="profile-cancel">取消</button><button class="primary" type="submit">保存</button></div></form></dialog>
+  <dialog id="conflict-dialog" aria-labelledby="conflict-title"><h2 id="conflict-title">确认画像信息</h2><p class="hint">新信息与当前画像不同。选择后直接保存，无需在聊天中回复 A/B。</p><p id="conflict-error" role="alert" hidden></p><div id="conflict-items"></div><button id="conflict-later">稍后处理</button></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/v2/assets/app.js?v=router-20261008" defer></script>
+</body>
+</html>

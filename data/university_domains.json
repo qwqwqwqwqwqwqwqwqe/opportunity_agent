@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "universities": [
+    {"name": "Carnegie Mellon University", "aliases": ["CMU", "Carnegie Mellon", "卡内基梅隆大学"], "domains": ["cmu.edu"]},
+    {"name": "University of Illinois Urbana-Champaign", "aliases": ["UIUC", "University of Illinois", "伊利诺伊大学香槟分校"], "domains": ["illinois.edu"]},
+    {"name": "University of California, San Diego", "aliases": ["UCSD", "University of California San Diego", "加州大学圣地亚哥分校"], "domains": ["ucsd.edu"]},
+    {"name": "University of California, Santa Barbara", "aliases": ["UCSB", "University of California Santa Barbara", "加州大学圣塔芭芭拉分校"], "domains": ["ucsb.edu"]},
+    {"name": "University of Washington", "aliases": ["UW", "UW Seattle", "华盛顿大学"], "domains": ["washington.edu"]},
+    {"name": "Duke University", "aliases": ["Duke", "杜克大学"], "domains": ["duke.edu"]},
+    {"name": "Brown University", "aliases": ["Brown", "布朗大学"], "domains": ["brown.edu"]},
+    {"name": "Northeastern University", "aliases": ["NEU", "Northeastern", "东北大学"], "domains": ["northeastern.edu"]},
+    {"name": "University of Southern California", "aliases": ["USC", "Southern California", "南加州大学"], "domains": ["usc.edu"]},
+    {"name": "Georgia Institute of Technology", "aliases": ["Georgia Tech", "GT", "佐治亚理工学院"], "domains": ["gatech.edu"]},
+    {"name": "Massachusetts Institute of Technology", "aliases": ["MIT", "麻省理工学院"], "domains": ["mit.edu"]},
+    {"name": "Stanford University", "aliases": ["Stanford", "斯坦福大学"], "domains": ["stanford.edu"]},
+    {"name": "University of California, Berkeley", "aliases": ["UC Berkeley", "UCB", "伯克利"], "domains": ["berkeley.edu"]},
+    {"name": "University of British Columbia", "aliases": ["UBC", "The University of British Columbia", "英属哥伦比亚大学", "不列颠哥伦比亚大学"], "domains": ["ubc.ca"]},
+    {"name": "University of Toronto", "aliases": ["UofT", "U of T", "UToronto", "多伦多大学"], "domains": ["utoronto.ca"]},
+    {"name": "University of Waterloo", "aliases": ["Waterloo", "UWaterloo", "滑铁卢大学"], "domains": ["uwaterloo.ca"]}
+  ]
+}

@@ -1,0 +1,111 @@
+// Run with Playwright available via NODE_PATH; no application dependency is added.
+const {chromium}=require('playwright');
+const {spawn}=require('child_process');
+const {once}=require('events');
+const assert=require('assert/strict');
+const fs=require('fs');
+const os=require('os');
+const path=require('path');
+
+(async()=>{
+  const server=spawn('python',['-B','tests/ui_fixture_server.py'],{cwd:path.resolve(__dirname,'..'),windowsHide:true,stdio:['pipe','pipe','pipe']});
+  server.stderr.on('data',chunk=>process.stderr.write(chunk));
+  let browser;
+  try{
+    const line=await new Promise((resolve,reject)=>{let data='';server.stdout.on('data',chunk=>{data+=chunk;if(data.includes('\n'))resolve(data.split('\n')[0])});server.on('error',reject);server.on('exit',code=>reject(Error('server exited '+code)))});
+    const url='http://127.0.0.1:'+JSON.parse(line).port;
+    const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
+    browser=await chromium.launch({headless:true,...(executablePath?{executablePath}:{})});
+    const a=await browser.newContext({viewport:{width:1280,height:850}}),b=await browser.newContext({viewport:{width:1280,height:850}});
+    const page=await a.newPage(),other=await b.newPage(),errors=[];
+    page.setDefaultTimeout(8000);other.setDefaultTimeout(8000);
+    page.on('pageerror',error=>errors.push(error.message));other.on('pageerror',error=>errors.push(error.message));
+    await page.goto(url);
+    await page.locator('#onboarding-overlay.visible').waitFor();
+    await page.locator('[name=school]').fill('XDU');await page.locator('[name=major]').fill('计算机');
+    await page.locator('[name=academic_year]').selectOption('2');
+    await page.locator('[name=graduation_month_value]').fill('2029-06');
+    await page.locator('[name=target_countries]').fill('美国');await page.locator('[name=target_degree]').selectOption('MS');
+    await page.locator('[name=target_fields]').fill('AI');
+    await page.locator('[name=next_exam_type]').selectOption('TOEFL');await page.locator('[name=next_exam_date]').fill('2028-09-10');
+    await page.locator('#submit-onboarding').click();
+    await page.locator('#onboarding-overlay.visible').waitFor({state:'hidden'});
+    const historicalNode=page.locator('.timeline-node.history').first();
+    await historicalNode.waitFor();
+    assert.equal(await historicalNode.locator('.timeline-date').last().textContent(),'已完成（待补录）');
+    assert(!String(await historicalNode.textContent()).includes(' · 历史'));
+    assert.equal(await page.locator('.timeline-node.now').count(),1,'only the current phase is purple');
+    assert.match(await page.locator('.timeline-node.now .timeline-label').textContent(),/暑假/);
+    const backgroundNode=page.locator('.timeline-node').filter({hasText:'背景提升'}).first();
+    assert(!await backgroundNode.evaluate(node=>node.classList.contains('now')));
+    assert.match(await backgroundNode.textContent(),/当前假期中/);
+    assert(!String(await backgroundNode.textContent()).includes('进行中'));
+    await historicalNode.click();
+    await page.locator('#timeline-update-overlay.visible').waitFor();
+    await page.locator('#timeline-update-form [name=detail]').fill('完成了实验室的信号分类复现实验');
+    page.once('dialog',dialog=>dialog.dismiss());
+    await page.locator('#timeline-update-form').evaluate(form=>form.requestSubmit());
+    await page.locator('#timeline-update-overlay.visible').waitFor({state:'hidden'});
+    await page.locator('#messages .agent').filter({hasText:'已将“完成了实验室的信号分类复现实验”加入'}).waitFor();
+    const project=page.locator('.progress-card').filter({has:page.locator('strong',{hasText:'完成一个'})}).first();
+    await project.waitFor();
+    const key=await project.getAttribute('data-select-target');
+    const card=page.locator('.progress-card[data-select-target="'+key+'"]');
+    await card.locator('[data-progress-action=start]').click();
+    await card.locator('.progress-badge.in_progress').waitFor();
+    page.once('dialog',dialog=>dialog.accept('2032-01-02'));
+    await card.locator('[data-progress-action=postpone]').click();
+    await card.getByText('日期超出阶段边界',{exact:true}).waitFor();
+    await card.locator('[data-progress-action=complete]').click();
+    await card.locator('.progress-badge.completed').waitFor();
+    await page.reload();await page.locator('.progress-card[data-select-target="'+key+'"] .progress-badge.completed').waitFor();
+    await other.goto(url);await other.locator('.progress-card[data-select-target="'+key+'"] .progress-badge.completed').waitFor();
+    await other.locator('.progress-card[data-select-target="'+key+'"] [data-progress-action=reset]').click();
+    await other.locator('.progress-card[data-select-target="'+key+'"] .progress-badge.planned').waitFor();
+    await page.reload();await card.locator('.progress-badge.planned').waitFor();
+    await page.locator('#input').fill('任务完成了');await page.locator('#send').click();
+    await page.locator('.confirmation-card').waitFor();
+    await page.locator('.confirmation-card select').selectOption(key);
+    await page.locator('.confirmation-card [data-confirm=true]').click();
+    await card.locator('.progress-badge.completed').waitFor();
+    await page.locator('#input').fill('可能取消托福考试');await page.locator('#send').click();
+    await page.locator('.confirmation-card').waitFor();
+    await page.reload();await page.locator('.confirmation-card').waitFor();
+    await page.locator('.confirmation-card [data-confirm=false]').click();
+    await page.locator('.confirmation-card').waitFor({state:'hidden'});
+    await page.locator('#input').fill('托福105分够吗？');await page.locator('#send').click();
+    await page.locator('#messages .agent').filter({hasText:'总分、单项分'}).waitFor();
+    const listing=await (await page.request.get(url+'/api/conversations')).json();
+    const sid=listing.conversations[0].session_id;
+    const record=await (await page.request.get(url+'/api/conversations/'+sid)).json();
+    assert.equal(record.state.profile.toefl_score,null);
+    const articleBefore=record.state.roadmap.article;
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#roadmap').scrollIntoViewIfNeeded();
+    const layout=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,timeline:document.querySelector('#timeline').getBoundingClientRect().bottom,messages:document.querySelector('#messages').getBoundingClientRect().top}));
+    assert(layout.scroll<=layout.width+1,JSON.stringify(layout));assert(layout.timeline<=layout.messages+1,JSON.stringify(layout));
+    const images=fs.mkdtempSync(path.join(os.tmpdir(),'progress-ui-shots-'));
+    await page.screenshot({path:path.join(images,'mobile.png'),fullPage:true});
+    await page.setViewportSize({width:1280,height:850});
+    await page.locator('.article-preview').scrollIntoViewIfNeeded();await page.locator('.article-preview').click();
+    await page.locator('#article-overlay.pinned').waitFor();await page.locator('#article-overlay').click({position:{x:4,y:4}});
+    await page.screenshot({path:path.join(images,'desktop.png'),fullPage:true});
+    await page.locator('.conversation-item').first().hover();page.once('dialog',dialog=>dialog.accept());
+    await page.locator('.conversation-delete').first().click();
+    await page.waitForFunction(()=>document.querySelectorAll('.conversation-item').length===0);
+    await other.reload();await other.locator('#onboarding-overlay.visible').waitFor();
+    const finalList=await (await other.request.get(url+'/api/conversations')).json();
+    assert(!finalList.conversations.some(c=>c.session_id===sid),'deleted cache resurrected');
+    assert(articleBefore.length>300);assert.deepEqual(errors,[]);
+    console.log(JSON.stringify({passed:true,checks:['onboarding','start/postpone/complete/reset','cross-browser restore','confirmation accept/reject','question safety','small-screen layout','article overlay','deletion tombstone'],screenshots:images}));
+  }finally{
+    if(browser)await browser.close();
+    // Closing stdin is unreliable for a Windows child that is blocked in
+    // readline; terminate this disposable fixture explicitly instead.
+    if(server.exitCode===null){
+      const exited=once(server,'exit');
+      server.kill();
+      await exited;
+    }
+  }
+})().catch(error=>{console.error(error);process.exitCode=1});

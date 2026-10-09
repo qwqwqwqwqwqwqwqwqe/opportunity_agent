@@ -1,0 +1,23 @@
+{
+  "description": "Synthetic multi-turn diagnostic cases; assistant turns are scripted, not model-generated. Not a human-reviewed Gold dataset.",
+  "cases": [
+    {"id":"score_explicit","history":[{"role":"user","content":"我准备更新语言成绩。"},{"role":"assistant","content":"你的托福这次考了多少分？"}],"message":"我的托福是110。","expected_facts":[{"field":"toefl_score","value":110,"evidence":"托福是110"}]},
+    {"id":"score_bare","history":[{"role":"user","content":"我原来的托福107。"},{"role":"assistant","content":"你的托福新成绩是多少？"}],"message":"110。","profile":{"toefl_score":107},"expected_facts":[{"field":"toefl_score","value":110,"evidence":"110"}],"known_gate_gap":true},
+    {"id":"score_this_time","history":[{"role":"user","content":"我上周又考了一次托福。"},{"role":"assistant","content":"这次考了多少分？"}],"message":"这次是110分。","expected_facts":[{"field":"toefl_score","value":110,"evidence":"110分"}],"known_gate_gap":true},
+    {"id":"score_supported_phrase","history":[{"role":"user","content":"我之前托福107。"},{"role":"assistant","content":"你的托福最近出分了吗？"}],"message":"我刚考到110。","profile":{"toefl_score":107},"expected_facts":[{"field":"toefl_score","value":110,"evidence":"刚考到110"}]},
+    {"id":"ielts_bare","history":[{"role":"user","content":"托福先不考了，我报了雅思。"},{"role":"assistant","content":"雅思总分是多少？"}],"message":"7.5。","expected_facts":[{"field":"ielts_score","value":7.5,"evidence":"7.5"}],"known_gate_gap":true},
+    {"id":"gpa_bare","history":[{"role":"user","content":"我想补充本科绩点。"},{"role":"assistant","content":"请告诉我四分制GPA。"}],"message":"3.85。","expected_facts":[{"field":"gpa","value":3.85,"evidence":"3.85"}],"known_gate_gap":true},
+    {"id":"summary_only_score","history":[],"summary":"本会话刚才讨论的是用户托福新成绩，助手询问新成绩；旧成绩107尚待用户更正。","message":"我刚考到110。","expected_facts":[{"field":"toefl_score","value":110,"evidence":"刚考到110"}],"known_gate_gap":true},
+    {"id":"no_history_ambiguous","history":[],"message":"110。","expected_facts":[]},
+    {"id":"hypothetical_not_fact","history":[{"role":"user","content":"我的托福还没有出分。"},{"role":"assistant","content":"我们可以讨论不同成绩下的情况。"}],"message":"如果托福110能申请吗？","expected_facts":[]},
+    {"id":"third_party_score","history":[{"role":"user","content":"我的托福还没出分。"},{"role":"assistant","content":"请只更新你自己的实际成绩。"}],"message":"我室友托福110，我的成绩还没出来。","expected_facts":[]},
+    {"id":"future_career_goal","history":[{"role":"user","content":"我还在读本科。"},{"role":"assistant","content":"你未来想从事什么职业？"}],"message":"我未来想做AI工程师。","expected_facts":[{"field":"career_goal","value":"AI Engineer","evidence":"未来想做AI工程师"}],"known_gate_gap":true},
+    {"id":"conditional_country","history":[{"role":"user","content":"我主要申请美国。"},{"role":"assistant","content":"加拿大在你的计划中是什么位置？"}],"message":"加拿大只是如果美国毕业以后找不到工作时的备选。","expected_facts":[],"expected_preferences":[{"key":"fallback_country","value":"Canada"}]},
+    {"id":"same_turn_correction","history":[{"role":"user","content":"我需要更新成绩。"},{"role":"assistant","content":"请告诉我最终成绩。"}],"message":"我托福105，现在托福110。","expected_facts":[{"field":"toefl_score","value":110,"evidence":"托福110"}]},
+    {"id":"revoke_preference","history":[{"role":"user","content":"以前我不想考GRE。"},{"role":"assistant","content":"之前的偏好是排除GRE项目。"}],"preferences":[{"key":"avoid_gre","value":true}],"message":"现在我愿意考GRE了，取消之前那个偏好。","expected_facts":[],"expected_preferences":[{"key":"avoid_gre","value":false}],"known_gate_gap":true},
+    {"id":"remember_project_a","kind":"recall","history":[{"role":"user","content":"这次用虚构项目举例：A叫星桥计算项目，B叫云帆智能项目。"},{"role":"assistant","content":"好的，接下来按A和B讨论这两个虚构项目。"},{"role":"user","content":"我更关心课程。"},{"role":"assistant","content":"可以按课程来比较。"}],"message":"刚才A叫什么？只回答项目名称。","expected_answer_contains":"星桥计算项目"},
+    {"id":"remember_corrected_alias","kind":"recall","history":[{"role":"user","content":"虚构项目A叫星桥计算项目。"},{"role":"assistant","content":"记下了本次对话的代号。"},{"role":"user","content":"更正一下，本次对话里A改叫海岚系统项目。"},{"role":"assistant","content":"后面用更新后的代号。"}],"message":"现在A叫什么？只回答项目名称。","expected_answer_contains":"海岚系统项目"},
+    {"id":"remember_from_summary","kind":"recall","history":[{"role":"user","content":"接着刚才讨论。"},{"role":"assistant","content":"好的。"}],"summary":"本会话使用虚构项目代号：A=星桥计算项目，B=云帆智能项目；用户优先讨论A。","message":"刚才A叫什么？只回答项目名称。","expected_answer_contains":"星桥计算项目"},
+    {"id":"remember_profile_score","kind":"recall","history":[{"role":"user","content":"请根据已经确认的画像回答。"},{"role":"assistant","content":"可以。"}],"profile":{"toefl_score":107},"message":"我已经确认的托福成绩是多少？只回答数字。","expected_answer_contains":"107"}
+  ]
+}

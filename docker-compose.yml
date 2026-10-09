@@ -1,0 +1,120 @@
+x-python-build: &python-build
+  context: .
+  args:
+    PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: opportunity_agent
+      POSTGRES_USER: opportunity
+      POSTGRES_PASSWORD: opportunity_dev_only
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opportunity -d opportunity_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    build: *python-build
+    environment:
+      DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random secret}
+      AUTO_CREATE_SCHEMA: "0"
+      DOMAIN_AGENT_TRANSPORT: a2a
+      JIUWEN_BACKEND: python
+      PROFILE_A2A_URL: http://profile:8771/a2a/jsonrpc/
+      RESEARCH_A2A_URL: http://research:8772/a2a/jsonrpc/
+      PLANNING_A2A_URL: http://planning:8773/a2a/jsonrpc/
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      SYNTHESIZER_TIMEOUT_SECONDS: ${SYNTHESIZER_TIMEOUT_SECONDS:-60}
+      SYNTHESIZER_RETRIES: ${SYNTHESIZER_RETRIES:-1}
+      SYNTHESIZER_BUDGET_SECONDS: ${SYNTHESIZER_BUDGET_SECONDS:-90}
+      SYNTHESIZER_MAX_TOKENS: ${SYNTHESIZER_MAX_TOKENS:-1400}
+      MEMORY_VECTOR_ENABLED: ${MEMORY_VECTOR_ENABLED:-0}
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      profile: {condition: service_healthy}
+      research: {condition: service_healthy}
+      planning: {condition: service_healthy}
+  profile:
+    build: *python-build
+    command: ["python", "-m", "opportunity_agent.v2.agents.a2a", "profile", "--host", "0.0.0.0", "--advertised-host", "profile", "--backend", "python"]
+    environment:
+      JIUWEN_BACKEND: python
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    expose: ["8771"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8771/.well-known/agent-card.json', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  research:
+    build: *python-build
+    command: ["python", "-m", "opportunity_agent.v2.agents.a2a", "research", "--host", "0.0.0.0", "--advertised-host", "research", "--backend", "python"]
+    environment:
+      JIUWEN_BACKEND: python
+      DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
+      REDIS_URL: redis://redis:6379/0
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      RESEARCH_WEB_ENABLED: ${RESEARCH_WEB_ENABLED:-0}
+      RESEARCH_QUEUE_INGEST: ${RESEARCH_QUEUE_INGEST:-0}
+      RESEARCH_PERSIST_FACTS: ${RESEARCH_PERSIST_FACTS:-1}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    expose: ["8772"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8772/.well-known/agent-card.json', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  planning:
+    build: *python-build
+    command: ["python", "-m", "opportunity_agent.v2.agents.a2a", "planning", "--host", "0.0.0.0", "--advertised-host", "planning", "--backend", "python"]
+    environment:
+      JIUWEN_BACKEND: python
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    expose: ["8773"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8773/.well-known/agent-card.json', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  worker:
+    build: *python-build
+    command: ["python", "-m", "opportunity_agent.v2.worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random secret}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+volumes:
+  postgres_data:

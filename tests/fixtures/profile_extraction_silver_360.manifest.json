@@ -1,0 +1,25 @@
+{
+  "name": "profile_extraction_silver_360",
+  "case_count": 360,
+  "label_source": "programmatic_template_annotation",
+  "human_review": "pending",
+  "purpose": "deterministic regression and ablation baseline; not a human Gold Dataset",
+  "expected_route_counts": {
+    "hybrid": 20,
+    "llm_only": 50,
+    "reject": 30,
+    "rule_only": 260
+  },
+  "categories": {
+    "academic_multi": 40,
+    "conditional_preference": 10,
+    "correction": 30,
+    "experience": 40,
+    "explicit_score": 90,
+    "mixed": 20,
+    "natural_target": 40,
+    "negative": 40,
+    "preference": 30,
+    "rank_graduation": 20
+  }
+}
