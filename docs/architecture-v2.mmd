@@ -1,0 +1,56 @@
+flowchart TB
+    U[用户 / 浏览器] <-->|HTTP + SSE| API[FastAPI · 鉴权 / REST / 执行事件]
+    API --> CTX[会话上下文 · 近期历史 / 摘要]
+    CTX --> O[Custom Orchestrator · ExecutionState / 预算 / 轮数]
+    CTX -->|召回偏好| MEM[Memory Service · 唯一偏好读写入口]
+    O --> G[独立 Goal Parser + 确定性 Guard]
+    G --> R[Router · RouteDecision]
+    R -->|direct_reply| S[Synthesizer · 无工具的最终回答]
+    R -->|delegate · Orchestrator 执行 A2A| P[Profile Agent]
+    R -->|delegate| RES[Research Agent]
+    R -->|delegate| PLAN[Planning Agent]
+
+    subgraph RET[Research 内部检索]
+        Q[Query Router · ResearchTaskSpec]
+        SQL[SQL · 结构化查询]
+        RAG[RAG · 向量 + 全文 / RRF / Reranker]
+        HYB[Hybrid · SQL 条件 + 语义证据]
+        WEB[MCP / Web · 官网搜索与读取]
+        EV[项目 / 周期 / 引句 / 字段证据校验]
+        Q --> SQL & RAG & HYB & WEB
+        SQL & RAG & HYB --> EV
+        EV -->|缺失 / 过期 / 要求最新| WEB
+        WEB --> EV
+    end
+    RES --> Q
+    EV --> RR[ResearchResult]
+    P --> PR[ProfileResult · 候选变更]
+    PLAN --> PL[PlanResult · 规划草稿]
+    PR & RR & PL --> A[Result Aggregation · 保留 / 合并去重 / 上下文构建]
+    A --> C[Completion Checker · 无状态检查]
+    C -->|RETRY · 缺失任务| O
+    O -->|定向补查研究缺项| RES
+    C -->|PASS / PARTIAL / NEED_USER / FAIL| S
+    S --> F[最终 answer → 前端]
+    S -.->|超时 / 不可用| FB[确定性降级 · 核验事实 / 缺口说明]
+    FB --> F
+
+    API --> AP[审批服务 · 确认 / 拒绝 / 版本检查]
+    AP -->|画像 / 申请 / 计划变更| DB[(PostgreSQL · 业务 / Run / 证据 / 偏好)]
+    AP -->|偏好确认 / 撤销| MEM
+    SQL & HYB --> DB
+    RAG --> V[(pgvector + knowledge_chunks)]
+    MEM --> DB
+    EV -->|核验事实缓存| DB
+    F --> TX[最终持久化事务 · 答案 / Run / 有效明确偏好]
+    TX --> MEM
+    TX -->|PASS 且最终事务提交| OUT[PostgreSQL Outbox]
+    OUT --> MC[Memory Consolidator Worker]
+    MC -->|推断偏好提案 · 不直接保存| MEM
+    MEM -->|待确认提案| AP
+    WEB -.->|可选全文摄取| RED[(Redis 队列)]
+    RED --> IW[Ingestion Worker]
+    IW --> V
+    API -.-> OT[OpenTelemetry → Jaeger · 可选]
+    O -.-> OT
+    RES -.-> OT
