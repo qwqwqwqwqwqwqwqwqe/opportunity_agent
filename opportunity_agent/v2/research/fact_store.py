@@ -11,7 +11,7 @@ from ...official_research import OfficialDomainRegistry, DynamicDomainCache, cla
 from ..db.models import OfficialSource, ResearchProgram, ResearchRequirement
 from .identity import school_aliases, program_aliases, canonical_school, canonical_program, normalize_intake
 from .normalization import supported_value
-from .task import intake_supported
+from .temporal import source_intake, expired_current_deadline, CURRENT_POLICY_PREFIX
 
 
 async def persist_verified_page(session, program, page, facts):
@@ -25,13 +25,16 @@ async def persist_verified_page(session, program, page, facts):
             and parsed.port in {None, 443} and any(host == d or host.endswith("." + d) for d in record["domains"])):
         raise ValueError("Fact persistence requires a verified official HTTPS source")
     match, _, _ = classify_program_page(name, title, url, body)
-    if match != "exact" or not intake_supported(intake, body):
-        raise ValueError("Fact persistence requires exact programme and explicit intake")
+    observed_intake = source_intake(intake, body)
+    if match != "exact":
+        raise ValueError("Fact persistence requires an exact programme")
     for fact in facts:
         if (fact["field"] not in {"deadline", "gre_policy", "tuition", "language"}
                 or not fact["quote"] or fact["quote"] not in body
                 or not supported_value(fact["field"], fact["value"], fact["quote"])):
             raise ValueError("Fact does not match its source quote")
+        if fact["field"] == "deadline" and expired_current_deadline(fact["value"], intake, date.today()):
+            raise ValueError("A past deadline cannot represent a current application cycle")
 
     # Programme locks cover aliases; URL locks also protect shared source rows.
     if session.bind.dialect.name == "postgresql":
@@ -75,14 +78,19 @@ async def persist_verified_page(session, program, page, facts):
             if not any(old.content_hash == digest and old.value == f["value"] and old.excerpt == f["quote"] for f in values.values()):
                 old.status = "superseded"
         for fact in values.values():
+            qualifier = fact["value"] if field == "gre_policy" else fact.get("qualifier", "")
+            if not observed_intake:
+                qualifier = CURRENT_POLICY_PREFIX + qualifier
+            qualifier = qualifier[:64]
             prior = next((o for o in active if o.content_hash == digest and o.value == fact["value"] and o.excerpt == fact["quote"]), None)
             if prior:
                 prior.verified_at, prior.expires_at = now, expires
+                prior.qualifier = qualifier
                 refreshed += 1
             else:
                 session.add(ResearchRequirement(program_id=row.id, source_id=source.id, field=field,
                     value=fact["value"], date_value=date.fromisoformat(fact["value"]) if field == "deadline" else None,
-                    qualifier=fact["value"] if field == "gre_policy" else fact.get("qualifier", ""),
+                    qualifier=qualifier,
                     excerpt=fact["quote"], content_hash=digest, verified_at=now, expires_at=expires,
                     status="verified", program_match="exact"))
                 written += 1

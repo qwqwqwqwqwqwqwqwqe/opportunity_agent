@@ -19,6 +19,12 @@ def usable(e: Evidence, criteria: SuccessCriteria, as_of: date | None = None) ->
     return e.relevance_score is not None and e.relevance_score >= criteria.minimum_relevance_score
 
 
+def intake_bound(program: ProgramResult, evidence: Evidence) -> bool:
+    if evidence.temporal_scope == "current_policy":
+        return not evidence.intake and evidence.retrieved_at is not None and evidence.expires_at is not None
+    return evidence.intake.casefold() == program.intake.casefold()
+
+
 def field_supported(program: ProgramResult, field: str, criteria: SuccessCriteria, as_of=None) -> bool:
     # Old serialized runs remain readable, but newly built results must bind fields.
     if not program.facts and not program.program_id:
@@ -33,10 +39,17 @@ def field_supported(program: ProgramResult, field: str, criteria: SuccessCriteri
         if field == "gre_policy":
             return fact.value == program.gre_policy
         return True
+
+    # Deadline and GRE policy are school/programme-level facts independent of project specialization.
+    # They can be sourced from generic admissions pages (not just exact programme pages).
+    # Other fields (tuition, curriculum, etc.) require exact programme match.
+    min_program_match = "generic" if field in {"deadline", "gre_policy"} else "exact"
+
     return any(f.verification_status == "verified" and any(
         eid in evidence and field in evidence[eid].supports_fields
-        and evidence[eid].program_match == "exact"
-        and evidence[eid].intake.casefold() == program.intake.casefold()
+        and (evidence[eid].program_match == "exact" or
+             (min_program_match == "generic" and evidence[eid].program_match in {"exact", "generic"}))
+        and intake_bound(program, evidence[eid])
         and usable(evidence[eid], criteria, as_of)
         for eid in f.evidence_ids) and matches_scalar(f) for f in observations)
 

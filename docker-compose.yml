@@ -3,6 +3,19 @@ x-python-build: &python-build
   args:
     PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
 
+x-research-budget: &research-budget
+  RESEARCH_PROGRESS_ENABLED: ${RESEARCH_PROGRESS_ENABLED:-1}
+  RESEARCH_TOOL_REPAIR_ENABLED: ${RESEARCH_TOOL_REPAIR_ENABLED:-0}
+  RESEARCH_PER_SCHOOL_SECONDS: ${RESEARCH_PER_SCHOOL_SECONDS:-}
+  RESEARCH_OVERHEAD_SECONDS: ${RESEARCH_OVERHEAD_SECONDS:-15}
+  RESEARCH_MAX_BUDGET_SECONDS: ${RESEARCH_MAX_BUDGET_SECONDS:-600}
+  RESEARCH_DISCOVERY_SCHOOL_COUNT: ${RESEARCH_DISCOVERY_SCHOOL_COUNT:-10}
+  RESEARCH_EXTRACT_TIMEOUT_SECONDS: ${RESEARCH_EXTRACT_TIMEOUT_SECONDS:-30}
+  RESEARCH_TARGET_MAX_ATTEMPTS: ${RESEARCH_TARGET_MAX_ATTEMPTS:-3}
+  RESEARCH_EXTRACT_FAILURE_LIMIT: ${RESEARCH_EXTRACT_FAILURE_LIMIT:-3}
+  EXECUTION_OVERHEAD_SECONDS: ${EXECUTION_OVERHEAD_SECONDS:-180}
+  EXECUTION_MAX_BUDGET_SECONDS: ${EXECUTION_MAX_BUDGET_SECONDS:-1800}
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -28,6 +41,7 @@ services:
   api:
     build: *python-build
     environment:
+      <<: *research-budget
       DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random secret}
@@ -70,6 +84,7 @@ services:
     build: *python-build
     command: ["python", "-m", "opportunity_agent.v2.agents.a2a", "research", "--host", "0.0.0.0", "--advertised-host", "research", "--backend", "python"]
     environment:
+      <<: *research-budget
       JIUWEN_BACKEND: python
       DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
       REDIS_URL: redis://redis:6379/0
@@ -80,6 +95,11 @@ services:
       RESEARCH_WEB_ENABLED: ${RESEARCH_WEB_ENABLED:-0}
       RESEARCH_QUEUE_INGEST: ${RESEARCH_QUEUE_INGEST:-0}
       RESEARCH_PERSIST_FACTS: ${RESEARCH_PERSIST_FACTS:-1}
+      RESEARCH_EXTRACT_MODEL: ${RESEARCH_EXTRACT_MODEL:-}
+      RESEARCH_REPAIR_MODEL: ${RESEARCH_REPAIR_MODEL:-}
+      RESEARCH_EXTRACT_REASONING_EFFORT: ${RESEARCH_EXTRACT_REASONING_EFFORT:-}
+      RESEARCH_WEB_PROXY: ${RESEARCH_WEB_PROXY:-}
+      RESEARCH_READ_FALLBACK: ${RESEARCH_READ_FALLBACK:-1}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

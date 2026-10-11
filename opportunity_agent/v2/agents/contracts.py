@@ -75,6 +75,7 @@ class Evidence(BaseModel):
     program_match: Literal["exact", "generic", "rejected", "unknown"] = "unknown"
     intake: str = ""
     content_hash: str = ""
+    temporal_scope: Literal["legacy", "explicit_intake", "current_policy"] = "legacy"
     supports_fields: list[str] = Field(default_factory=list)
     relevance_method: str = "legacy"
     relevance_passed: bool | None = None
@@ -248,6 +249,8 @@ class AgentFailure(BaseModel):
 class ExecutionState(BaseModel):
     _event_queue: Any = PrivateAttr(default=None)
     _execution_deadline: float | None = PrivateAttr(default=None)
+    _execution_scope: Any = PrivateAttr(default=None)
+    _execution_started: float | None = PrivateAttr(default=None)
     user_id: str
     conversation_id: str
     run_id: str
