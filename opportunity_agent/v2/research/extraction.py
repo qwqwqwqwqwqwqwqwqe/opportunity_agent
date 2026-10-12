@@ -57,6 +57,11 @@ class AdmissionFact(BaseModel):
             normalized = self.value.strip().lower().replace(' ', '_').replace('-', '_')
             if normalized in {'required', 'optional', 'not_required', 'not_accepted'}:
                 self.value = normalized
+        # A year-less deadline's value is defined as its verbatim date_text; models
+        # often tidy "February 1st" to "February 1". date_text is still verified
+        # against the quote, so taking it as the value adds no interpretation.
+        if self.field == 'deadline' and self.date_year_status == 'unknown' and self.date_text:
+            self.value = self.date_text
         return self
 
 
@@ -110,14 +115,80 @@ def degree_of(text):
     return 'unknown'
 
 
+def _same_subject(expected, observed):
+    """A degree-less request ("Computational Science and Engineering") names the
+    subject; "Master of Science in …" on the page is the same programme. Degree
+    agreement is enforced separately by verify_fact's degree checks."""
+    from ...official_research import program_name_words
+    if degree_of(expected) != 'unknown':
+        return False
+    subject = program_name_words(expected)
+    return len(subject) >= 2 and subject == program_name_words(observed)
+
+
 def program_key(text):
     text = _norm(text)
     text = re.sub(r'\b(master of science|masters of science|m sc|msc|m s|ms)\b', 'ms', text)
     return ' '.join(w for w in text.split() if w not in {'in', 'of', 'the', 'and'})
 
 
+_CONNECTOR = {'and', 'of', 'in', 'for', 'the', '&'}
+
+
+def declared_abbreviations(scope):
+    """{ABBR: Full Name} only where the source itself writes "Full Name (ABBR)"
+    and ABBR is the initials of the name's capitalized words. No global dictionary."""
+    found = {}
+    for match in re.finditer(r'((?:[A-Z][\w&-]*\s+(?:(?:and|of|in|for|the|&)\s+)*){1,8})\(\s*([A-Z][A-Za-z0-9&]{1,9})\s*\)', scope):
+        words, abbr = match[1].split(), match[2]
+        for start in range(len(words)):
+            significant = [w for w in words[start:] if w.casefold() not in _CONNECTOR]
+            if (significant and words[start][0].isupper()
+                    and ''.join(w[0] for w in significant).upper() == abbr.replace('&', '').upper()):
+                found[abbr] = ' '.join(words[start:])
+                break
+    return found
+
+
+def page_acronym(requested, full, page_text):
+    """A requested acronym ("MSAII", "MS CSE") names `full` when this page itself
+    uses the acronym AND its letters are the initials of `full`'s capitalized
+    words ("Master of Science in Artificial Intelligence and Innovation").
+    Page-local by construction: CSE may mean a different programme elsewhere."""
+    acronym = re.fullmatch(r'(?:(M\.?S\.?c?|MEng|Ph\.?D\.?)\s+)?([A-Za-z]{2,8})', requested.strip())
+    if not acronym or not re.search(r'(?<![A-Za-z0-9])' + re.escape(acronym[2]) + r'(?![A-Za-z0-9])', page_text, re.I):
+        return False
+    words = [w for w in re.findall(r"[A-Za-z]+", full) if w.casefold() not in _CONNECTOR]
+    initials = ''.join(w[0] for w in words).upper()
+    wanted = acronym[2].upper()
+    # Either the full name including its degree ("MSAII"), or the subject only
+    # after a stated degree prefix ("MS CSE" -> subject initials "CSE").
+    from ...official_research import program_name_words
+    subject = ''.join(w[0] for w in program_name_words(full) if w not in _CONNECTOR).upper()
+    if acronym[1]:
+        return subject == wanted and degree_of(requested) == degree_of(full)
+    return wanted in {initials, subject}
+
+
+def expand_abbreviations(text, names):
+    for abbr, full in names.items():
+        text = re.sub(r'(?<![A-Za-z0-9])' + re.escape(abbr) + r'(?![A-Za-z0-9])', full, text)
+    return text
+
+
 def same_program(expected, observed, scope):
     if program_key(expected) == program_key(observed):
+        return True
+    # "MS CSE" on a page that itself defines "Computational Science and Engineering (CSE)".
+    names = declared_abbreviations(scope)
+    if names:
+        e, o = expand_abbreviations(expected, names), expand_abbreviations(observed, names)
+        if (e, o) != (expected, observed) and _same_subject(e, o):
+            return True
+    # A degree-less request ("Computational Science and Engineering") names the
+    # subject; the page's "Master of Science in …" is the same programme. Degree
+    # agreement is enforced separately by verify_fact's degree checks.
+    if _same_subject(expected, observed):
         return True
     # Abbreviations require an explicit LOCAL name (abbreviation) declaration.
     # Never expand CSE/MDS from a global cross-school alias dictionary.
@@ -231,15 +302,25 @@ def verify_fact(fact, target, page, fields, as_of, source_blocks=None):
         return None, 'unrequested_or_unofficial_source'
     if canonical_school(fact.university) != canonical_school(target.university):
         return None, 'school_mismatch'
-    block = next((b for b in (source_blocks or blocks(page['text'], page['title'])) if b['id'] == fact.block_id), None)
+    all_blocks = source_blocks or blocks(page['text'], page['title'])
+    block = next((b for b in all_blocks if b['id'] == fact.block_id), None)
     if not block or fact.quote not in block['text']:
         return None, 'quote_not_in_block'
     local = '\n'.join([*block['headings'], block['text']])
     scope = block['title'] + '\n' + local
-    if not fact.program_quote or fact.program_quote not in scope or not same_program(fact.program, fact.program_quote, scope):
+    # Programme identity may be declared by an ENCLOSING section's intro (its
+    # headings are a prefix of this block's), never by a sibling section.
+    # Only identity/abbreviations use this; degree, cycle and scope stay local.
+    enclosing = [b['text'] for b in all_blocks if b['start'] < block['start']
+                 and b['headings'] == block['headings'][:len(b['headings'])]]
+    identity_scope = '\n'.join([scope, *enclosing])
+    if (not fact.program_quote or fact.program_quote not in identity_scope
+            or not same_program(fact.program, fact.program_quote, identity_scope)):
         return None, 'program_identity_not_grounded'
-    if target.program and not same_program(target.program, fact.program, scope):
+    if target.program and not (same_program(target.program, fact.program, identity_scope)
+                               or page_acronym(target.program, fact.program, page['title'] + '\n' + page['text'])):
         return None, 'program_mismatch'
+    names = declared_abbreviations(identity_scope)
     expected_degree = getattr(target, 'degree', '') or degree_of(target.program)
     if fact.degree == 'unknown' or (expected_degree != 'unknown' and fact.degree != expected_degree):
         return None, 'degree_mismatch'
@@ -253,7 +334,14 @@ def verify_fact(fact, target, page, fields, as_of, source_blocks=None):
     # A sibling/leaf programme heading overrides the generic page title.
     for heading in block['headings']:
         if degree_of(heading) != 'unknown' and program_key(fact.program) not in program_key(heading):
-            if not same_program(fact.program, heading.lstrip('# ').strip(), scope):
+            # "CSE M.S. Application Requirements" under a page that declares (CSE):
+            # compare subjects, ignoring degree and generic words, after expansion.
+            from ...official_research import program_name_words
+            subject = [w for w in program_name_words(expand_abbreviations(fact.program, names)) if w not in _CONNECTOR]
+            heading_words = set(re.findall(r'[a-z0-9]+', expand_abbreviations(heading, names).casefold().replace('&', ' and ')))
+            if subject and len(subject) >= 2 and set(subject) <= heading_words:
+                continue
+            if not same_program(fact.program, heading.lstrip('# ').strip(), identity_scope):
                 return None, 'mixed_program_scope'
     # Unstructured multi-programme prose is ambiguous even without HTML headings.
     names = re.findall(r'\b(?:Master of|MSc in|MS in|PhD in)\s+[A-Za-z][A-Za-z &-]{2,100}', local)

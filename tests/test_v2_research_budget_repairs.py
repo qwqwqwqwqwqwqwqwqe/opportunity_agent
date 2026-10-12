@@ -79,7 +79,9 @@ def test_budget_scales_with_schools_and_is_capped(monkeypatch):
     assert research_seconds(20) == 1200
 
 
-def test_service_refines_budget_using_unique_schools_not_programs(monkeypatch):
+def test_service_budget_counts_school_programme_targets(monkeypatch):
+    # Two programmes at one school each get an allowance; sharing one school's
+    # time starved the second programme (MSCS + ECE at Georgia Tech).
     monkeypatch.setenv("RESEARCH_WEB_ENABLED", "0")
     async def run():
         service = ResearchService(None, llm=SimpleNamespace(enabled=False))
@@ -89,8 +91,8 @@ def test_service_refines_budget_using_unique_schools_not_programs(monkeypatch):
             async def search(self, task, **kwargs): return rows if kwargs else []
         service.catalog = Catalog()
         result = await service.execute(request(remaining_budget_seconds=500))
-        assert result.diagnostics["budget_school_count"] == 2, result.model_dump()
-        assert result.diagnostics["budget_seconds"] == 135
+        assert result.diagnostics["budget_school_count"] == 3, result.model_dump()
+        assert result.diagnostics["budget_seconds"] == 195
         limited = await service.execute(request(remaining_budget_seconds=10))
         assert limited.diagnostics["budget_seconds"] == 10
     asyncio.run(run())
@@ -228,7 +230,8 @@ def test_repairs_prioritize_unattempted_targets_and_skip_seen_pages():
     asyncio.run(run())
 
 
-def test_a2a_research_allowance_is_dynamic_and_carries_only_progress():
+def test_a2a_research_allowance_is_dynamic_and_carries_only_progress(monkeypatch):
+    monkeypatch.setenv("RESEARCH_MAX_BUDGET_SECONDS", "600")  # cap under test, not the default
     execution = state()
     execution.profile_payload = {"gpa": 4}
     execution.research_result = ResearchResult(diagnostics={"web_progress": {"k": {"attempts": 1}}})
@@ -259,6 +262,7 @@ def test_mcp_call_uses_remaining_school_allowance():
 
 
 def test_python_a2a_wait_budget_extends_beyond_old_90_seconds(monkeypatch):
+    monkeypatch.setenv("RESEARCH_MAX_BUDGET_SECONDS", "600")  # wait = research cap + 10s grace
     import opportunity_agent.v2.agents.a2a as a2a
     observed = []
     original_wait = asyncio.wait_for

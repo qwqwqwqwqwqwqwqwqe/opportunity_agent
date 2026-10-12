@@ -11,7 +11,8 @@ import base64
 import zlib
 
 from ..core.config import settings
-from ..core.research_budget import execution_limit, school_seconds
+from ..core.research_budget import (execution_limit, school_seconds, target_tool_limit, target_decision_limit,
+                                    run_tool_cap, run_decision_cap)
 from .repair import ToolFailure
 
 
@@ -22,14 +23,15 @@ class RedisToolLedger:
         digest = hashlib.sha256(f"{user_id}:{run_id}".encode()).hexdigest()
         self.key = "research:tools:" + digest
         self.ttl = int(execution_limit() + 180 + 3600)
-        self.initial = {"version": 1, "tool_limit": min(60, 6 * max(1, schools)),
-            "decision_limit": min(20, 2 * max(1, schools)), "tools_used": 0, "decisions_used": 0,
+        self.initial = {"version": 1, "tool_limit": min(run_tool_cap(), target_tool_limit() * max(1, schools)),
+            "decision_limit": min(run_decision_cap(), target_decision_limit() * max(1, schools)),
+            "tools_used": 0, "decisions_used": 0,
             "schools": {}, "calls": [], "signatures": {}, "circuit": {}, "blocked": False}
         if inherited and inherited.get("version") == 1:
             # A saved snapshot can recover an expired key, never increase its allowance.
             self.initial.update(copy.deepcopy({k: v for k, v in inherited.items() if k != "_progress"}))
-            self.initial["tool_limit"] = min(60, self.initial["tool_limit"])
-            self.initial["decision_limit"] = min(20, self.initial["decision_limit"])
+            self.initial["tool_limit"] = min(run_tool_cap(), self.initial["tool_limit"])
+            self.initial["decision_limit"] = min(run_decision_cap(), self.initial["decision_limit"])
         self.state = copy.deepcopy(self.initial)
 
     async def _change(self, mutate):
@@ -95,7 +97,7 @@ class RedisToolLedger:
                 raise ToolFailure("TOOL_BUDGET_EXHAUSTED")
             if entry["seconds"] >= school_seconds():
                 raise ToolFailure("SCHOOL_BUDGET_EXHAUSTED")
-            kind, limit = ("tools", 6) if tool else ("decisions", 2)
+            kind, limit = ("tools", target_tool_limit()) if tool else ("decisions", target_decision_limit())
             total = "tools_used" if tool else "decisions_used"
             cap = "tool_limit" if tool else "decision_limit"
             if entry[kind] >= limit or s[total] >= s[cap]:

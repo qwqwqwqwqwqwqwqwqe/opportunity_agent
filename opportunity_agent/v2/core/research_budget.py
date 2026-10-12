@@ -16,12 +16,33 @@ def seconds(name, default, maximum=3600):
 
 
 def school_seconds():
-    return seconds("RESEARCH_PER_SCHOOL_SECONDS", 90 if os.getenv("RESEARCH_TOOL_REPAIR_ENABLED", "0") == "1" else 60, 600)
+    # 180s: map-based discovery reads 2-3 pages per target, and one extraction
+    # on a slow gateway can take 30-60s.
+    return seconds("RESEARCH_PER_SCHOOL_SECONDS", 180 if os.getenv("RESEARCH_TOOL_REPAIR_ENABLED", "0") == "1" else 60, 600)
+
+
+def target_tool_limit():
+    """Tool calls per school-programme target. search+read+extract+map+read+extract
+    is the minimal path to a fact on a programme sub-page; 14 leaves room for
+    reading 3-4 mapped sub-pages and read fallbacks."""
+    return int(seconds("RESEARCH_TARGET_TOOL_LIMIT", 14, 30))
+
+
+def target_decision_limit():
+    return int(seconds("RESEARCH_TARGET_DECISION_LIMIT", 4, 10))
+
+
+def run_tool_cap():
+    return int(seconds("RESEARCH_RUN_TOOL_LIMIT", 140, 400))
+
+
+def run_decision_cap():
+    return int(seconds("RESEARCH_RUN_DECISION_LIMIT", 40, 100))
 
 
 def research_limit():
     # The old setting remains an explicit hard cap, not the default budget.
-    return seconds("RESEARCH_BUDGET_SECONDS", seconds("RESEARCH_MAX_BUDGET_SECONDS", 600))
+    return seconds("RESEARCH_BUDGET_SECONDS", seconds("RESEARCH_MAX_BUDGET_SECONDS", 1200))
 
 
 def research_seconds(school_count):

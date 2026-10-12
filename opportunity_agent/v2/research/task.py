@@ -73,6 +73,44 @@ def is_policy_impact_question(query):
                 and not re.search(r"帮我找|推荐|筛选|列出|find|recommend|filter", query, re.I))
 
 
+# Words that describe the request, not a programme's name.
+_REQUEST_WORDS = {"deadline", "deadlines", "gre", "toefl", "ielts", "tuition", "fees", "fee", "requirement",
+                  "requirements", "admission", "admissions", "application", "apply", "info", "information",
+                  "fall", "spring", "summer", "autumn", "winter", "intake", "official", "policy", "program",
+                  "programme", "graduate", "the", "of", "and", "in", "for", "at", "to", "a", "an", "s"}
+_CONNECTORS = {"of", "and", "in", "for", "the", "&"}
+
+
+def query_program_span(query, school_aliases_found):
+    """Longest Latin-script phrase left after removing school, cycle and request words.
+
+    This keeps a user-named programme (e.g. one absent from the catalogue) as an
+    *unverified* name instead of dropping it; official pages confirm it later.
+    """
+    text = query
+    for alias in sorted(school_aliases_found, key=len, reverse=True):
+        text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(alias) + r"(?![A-Za-z0-9])", " | ", text, flags=re.I)
+    text = re.sub(r"20\d{2}", " | ", text)
+    best = []
+    for run in re.split(r"[^A-Za-z&.' -]+|\s[|]\s", text):
+        words = [w for w in re.split(r"\s+", run.strip()) if w]
+        # Request words split runs, so "GRE deadline" never joins a programme name.
+        segment = []
+        for word in words + ["|"]:
+            if word == "|" or (word.casefold().strip(".") in _REQUEST_WORDS and word.casefold() not in _CONNECTORS):
+                while segment and segment[0].casefold() in _CONNECTORS:
+                    segment.pop(0)
+                while segment and segment[-1].casefold() in _CONNECTORS:
+                    segment.pop()
+                significant = [w for w in segment if w.casefold() not in _CONNECTORS]
+                if len(significant) >= 2 and len(segment) > len(best):
+                    best = segment
+                segment = []
+            else:
+                segment.append(word)
+    return " ".join(best)
+
+
 def parse_task(request, catalogue=(), llm=None) -> ResearchTaskSpec:
     query = request.message
     lower = query.casefold()
@@ -136,6 +174,22 @@ def parse_task(request, catalogue=(), llm=None) -> ResearchTaskSpec:
     task.entities.programs = sorted(programs)
     if not programs and re.search(r"计算机(?:科学)?(?:专业)?硕士|计算机科学|computer science", lower):
         task.entities.program_family = "computer_science"
+    # Degree only when the user states it; never default an unknown programme to MS.
+    doctoral = re.search(r"博士|ph\.?\s?d|doctor", lower)
+    masters = re.search(r"硕士|master|(?<![a-z])m\.?s\.?(?![a-z])|mscs|msml|msaii|(?<![a-z])mcs(?![a-z])", lower)
+    if bool(doctoral) != bool(masters):
+        task.entities.degree = "doctoral" if doctoral else "masters"
+    # A single named school with a programme outside the registry/catalogue:
+    # keep the user's wording as an unverified name rather than an empty scope.
+    if len(schools) == 1 and not programs and not task.entities.program_family:
+        found = [a for s in schools for a in school_aliases(s) if mentioned(a)]
+        found += [a for item in OfficialDomainRegistry().items if canonical_school(item["name"]) in schools
+                  for a in [item["name"], *item.get("aliases", [])] if mentioned(a)]
+        span_name = query_program_span(query, found)
+        if span_name:
+            task.entities.program = span_name
+            task.entities.programs = [span_name]
+            task.routing_diagnostics["program_source"] = "query_span_unverified"
     # Preserve explicit local pairings, e.g. CMU MSCS、UIUC MCS. Only
     # use pair restrictions when every named school is paired in its clause;
     # school lists followed by a shared programme list remain independent scope.
@@ -189,7 +243,15 @@ def parse_task(request, catalogue=(), llm=None) -> ResearchTaskSpec:
             parsed = SemanticParse()
         else:
             task.routing_diagnostics["parse_mode"] = "model"
-        for key, value in parsed.entities.model_dump().items():
+        if (task.routing_diagnostics.get("program_source") == "query_span_unverified"
+                and parsed.entities.program and parsed.entities.program.casefold() in lower):
+            # The model's reading of the user's own wording beats the rule span.
+            task.entities.program = parsed.entities.program
+            task.entities.programs = [parsed.entities.program]
+            task.routing_diagnostics["program_source"] = "model_unverified"
+        # Typed attributes, not model_dump(): targets must stay ResearchTarget objects.
+        for key in ResearchEntities.model_fields:
+            value = getattr(parsed.entities, key)
             if value and not getattr(task.entities, key) and not (
                 key == "university" and task.entities.universities or key == "program" and task.entities.programs
                 or key == "country" and task.entities.countries):
@@ -218,6 +280,11 @@ def parse_task(request, catalogue=(), llm=None) -> ResearchTaskSpec:
         task.excluded_programs = [(canonical_school(u), p.casefold(), i.casefold())
             for u, p, i in request.missing_task.excluded_programs]
         task.requested_fields = list(dict.fromkeys(task.requested_fields + task.missing_fields))
+    if (not task.requested_fields and task.entities.program and not task.semantic_questions
+            and re.search(r"信息|情况|介绍|详情|概况|\binfo\b|information|details|overview", query, re.I)):
+        # "Programme X information" asks for its admissions facts, not research areas.
+        task.requested_fields = ["deadline", "gre_policy"]
+        task.routing_diagnostics["fields_source"] = "default_admission_fields"
     if not task.requested_fields:
         task.requested_fields = ["research"]
         task.semantic_questions = [query]

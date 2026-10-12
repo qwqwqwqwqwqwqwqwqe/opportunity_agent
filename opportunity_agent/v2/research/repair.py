@@ -12,9 +12,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ...llm_client import LLMClient
 
 TOOLS = ("search_official_pages", "validate_official_url", "read_official_page",
-         "extract_official_page", "extract_program_facts")
+         "extract_official_page", "extract_program_facts", "map_official_site")
 ERROR_MESSAGES = {
     "NO_RELEVANT_RESULTS": "搜索没有候选页面，请调整关键词，保持项目和入学季约束。",
+    "NO_NEW_RESULTS": "搜索只返回已读过的页面；请换用不同关键词、站内链接发现或跳过该目标，不要重复相同查询。",
+    "NO_PROGRAM_LINKS": "项目页面下没有发现可读取的招生相关子页面。",
     "PROGRAM_MISMATCH": "页面不能明确匹配目标项目，不能使用学校首页或其他项目代替。",
     "INTAKE_UNSUPPORTED": "页面明确标注的入学季与目标不符，不能用其他申请季政策替代。",
     "MISSING_FIELDS": "已有部分合格证据，但仍有请求字段缺失；保留已有事实。",
@@ -49,7 +51,8 @@ class ToolArguments(BaseModel):
 class RepairDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: Literal["call_tool", "skip_target", "stop_research", "need_user"]
-    tool: Literal["", "search_official_pages", "validate_official_url", "read_official_page", "extract_official_page", "extract_program_facts"] = ""
+    tool: Literal["", "search_official_pages", "validate_official_url", "read_official_page", "extract_official_page",
+                  "extract_program_facts", "map_official_site"] = ""
     arguments: ToolArguments = Field(default_factory=ToolArguments)
     question: str = Field(default="", max_length=300)
 

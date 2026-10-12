@@ -309,7 +309,8 @@ def test_semantic_parse_wall_budget_falls_back_without_waiting_for_model(monkeyp
             time.sleep(.1)
         return original_parse(req, catalogue)
     monkeypatch.setattr(module, "parse_task", slow_parse)
-    monkeypatch.setattr(module.asyncio, "timeout", lambda delay: original_timeout(.01 if delay == 7 else delay))
+    monkeypatch.setenv("RESEARCH_PARSE_TIMEOUT_SECONDS", "7")  # wall budget = parse timeout + 3s overhead
+    monkeypatch.setattr(module.asyncio, "timeout", lambda delay: original_timeout(.01 if delay == 10 else delay))
     monkeypatch.setenv("RESEARCH_WEB_ENABLED", "0")
     class Retriever:
         async def search(self, *args, **kwargs):

@@ -20,7 +20,7 @@ def run_failure_report(state):
         "extract_failure": "模型字段提取失败。",
         "budget_exhausted": "检索时间预算耗尽。",
         "other": "研究工具链未能完成该步骤。",
-        "tool_budget": "研究工具次数、修复次数、单页面提取次数或单校时间限制已到达。每校最多 6 次工具、2 次修复决策，单页面最多 2 次提取；RESEARCH_PER_SCHOOL_SECONDS 只调整时间，不增加调用次数。",
+        "tool_budget": "研究工具次数、修复次数、单页面提取次数或单校时间限制已到达。每个学校-项目目标的工具次数受 RESEARCH_TARGET_TOOL_LIMIT（默认 14）、修复决策受 RESEARCH_TARGET_DECISION_LIMIT（默认 4）限制，单页面最多 2 次提取；RESEARCH_PER_SCHOOL_SECONDS 只调整时间，不增加调用次数。",
         "repeated_call": "相同的失败调用或未改变档位/字段的重复提取被阻止；这是调用去重限制，不是官网连接失败。",
         "ledger_unavailable": "研究预算账本不可用，已安全停止外部调用。",
         "source_mismatch": "页面证据不满足项目、入学季或字段要求，未计作合格结果。",
@@ -37,7 +37,8 @@ def run_failure_report(state):
             "tool_budget" if code in {"TOOL_BUDGET_EXHAUSTED", "REPAIR_BUDGET_EXHAUSTED", "SCHOOL_BUDGET_EXHAUSTED", "PAGE_EXTRACTION_LIMIT"} else
             "repeated_call" if code in {"REPEATED_FAILED_CALL", "UNCHANGED_EXTRACTION_RETRY"} else
             "ledger_unavailable" if code == "LEDGER_UNAVAILABLE" else
-            "source_mismatch" if code in {"PROGRAM_MISMATCH", "INTAKE_UNSUPPORTED", "MISSING_FIELDS", "NO_SUPPORTED_FACTS"} else
+            "source_mismatch" if code in {"PROGRAM_MISMATCH", "INTAKE_UNSUPPORTED", "MISSING_FIELDS", "NO_SUPPORTED_FACTS",
+                                          "NO_NEW_RESULTS", "NO_PROGRAM_LINKS"} else
             "repair_planner_failure" if stage == "repair" else
             "empty_content" if code == "EMPTY_CONTENT" else
             "official_domain_boundary" if code in {"HTTPS_REQUIRED", "OFFICIAL_DOMAIN_REJECTED", "PORT_REJECTED", "URL_CREDENTIALS_REJECTED", "PRIVATE_ADDRESS_REJECTED"} else

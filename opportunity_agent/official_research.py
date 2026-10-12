@@ -576,6 +576,45 @@ def _program_alias_matches(text: str, alias: str) -> bool:
     return alias in text or text == alias
 
 
+def program_name_words(program: str) -> list[str]:
+    """Subject words of a programme name, without its degree prefix."""
+    words = re.findall(r"[a-z0-9]+", program.casefold().replace("&", " and "))
+    # Degree wording before the subject ("Master of Science in", "Master's degree in", "MS").
+    prefix = re.match(r"(?:(?:master|masters|doctor|bachelor)(?: s)?(?: of (?:science|arts|philosophy|engineering)| degree)"
+                      r"|m ?s|msc|ph ?d|meng)(?: in| of)? ", " ".join(words) + " ")
+    words = " ".join(words)[prefix.end():].split() if prefix else words
+    # A trailing "(ABBR)" that is just the name's own initials adds nothing.
+    significant = [w for w in words[:-1] if w not in {"and", "of", "in", "the", "for"}]
+    if len(significant) >= 2 and words[-1] == "".join(w[0] for w in significant):
+        words = words[:-1]
+    return words
+
+
+def program_name_on_page(program: str, title: str, url: str, text: str) -> str:
+    """Where a full programme name appears as page identity: title, URL path or a heading.
+
+    Navigation menus and footers routinely list sibling programmes, so body
+    mentions do not count. Returns "" when the name is not shown as identity.
+    """
+    words = program_name_words(program)
+    if len([w for w in words if w not in {"and", "of", "in", "the", "for"}]) < 2:
+        return ""
+    phrase = re.compile(r"(?<![a-z0-9])" + r"[^a-z0-9]+".join(map(re.escape, words)) + r"(?![a-z0-9])")
+    if phrase.search(" ".join(re.findall(r"[a-z0-9]+", title.casefold().replace("&", " and ")))):
+        return "title"
+    try:
+        path = urlparse(url).path
+    except ValueError:
+        path = ""
+    if phrase.search(" ".join(re.findall(r"[a-z0-9]+", path.casefold()))):
+        return "url"
+    for line in text[:3000].splitlines()[:40]:
+        if re.match(r"\s*#{1,3}\s", line) and len(line) <= 200 and phrase.search(
+                " ".join(re.findall(r"[a-z0-9]+", line.casefold().replace("&", " and ")))):
+            return "heading"
+    return ""
+
+
 def classify_program_page(program: str, title: str, url: str, text: str) -> tuple[str, str, list[str]]:
     """Return exact/generic/rejected without trusting a search-result label."""
     haystack = _normalise_entity(" ".join([title, url, text[:12000]]))
@@ -646,6 +685,11 @@ def classify_program_page(program: str, title: str, url: str, text: str) -> tupl
             # abbreviated program title is absent from the page title.
             return "exact", "department", [f"accepted department identity: {term}" for term in departments[:3]]
         return "generic", "university_wide", ["no target-program alias on page"]
+    # Unregistered programme: its own full name as page identity is the only
+    # exact signal. Checked before unrelated terms, which also match nav menus.
+    where = program_name_on_page(program, title, url, text) if program else ""
+    if where:
+        return "exact", "program", [f"programme name in page {where}"]
     unrelated = [term for term in (*_CONFLICTING_PROGRAM_TERMS, *_OTHER_ENGINEERING_PROGRAM_TERMS,
                                     *_OTHER_DEPARTMENT_TERMS) if term in haystack]
     if unrelated:

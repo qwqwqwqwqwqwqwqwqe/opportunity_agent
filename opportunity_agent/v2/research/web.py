@@ -197,7 +197,7 @@ class TavilyMCP:
         supported = schema.get("properties", {})
         if any(k not in supported for k in arguments):
             raise ValueError("MCP schema does not support required scoped arguments")
-        with span("mcp.search" if name == "tavily_search" else "mcp.extract", tool=name):
+        with span({"tavily_search": "mcp.search", "tavily_map": "mcp.map"}.get(name, "mcp.extract"), tool=name):
             # Use the MCP SDK's request timeout. Wrapping call_tool in asyncio.wait_for
             # cancels its AnyIO task group and can poison later calls in the session.
             timeout = max(.01, min(20, self.request_timeout_seconds))
@@ -221,6 +221,36 @@ class TavilyMCP:
         self.search_calls += 1
         return await self._call("tavily_search", {"query": query, "include_domains": list(domains),
                                                   "max_results": 5, "search_depth": "basic"})
+
+    async def map(self, url, domains, *, limit=30):
+        """Link discovery below a verified official page. Returns URLs only.
+
+        Uses Map, not Crawl: Crawl returns page content, which would bypass the
+        reader's HTTPS, redirect, SSRF and size checks. Every URL is read later
+        through the normal validated reader.
+        """
+        if "tavily_map" not in self.tools:
+            raise RuntimeError("MCP server did not offer tavily_map")
+        if self.search_calls >= self.search_limit:
+            raise RuntimeError("Research search budget exhausted")
+        host = (urlparse(url).hostname or "").casefold()
+        if not any(host == d or host.endswith("." + d) for d in domains):
+            raise ValueError("Map URL left verified official domains")
+        self.search_calls += 1
+        _, schema = self.tools["tavily_map"]
+        supported = schema.get("properties", {})
+        arguments = {k: v for k, v in {"url": url, "max_depth": 1, "max_breadth": 30, "limit": limit,
+            "select_domains": ["^" + re.escape(host) + "$"], "allow_external": False}.items() if k in supported}
+        data = await self._call("tavily_map", arguments)
+        found = []
+        for item in data.get("results", []) if isinstance(data, dict) else []:
+            link = item if isinstance(item, str) else item.get("url", "") if isinstance(item, dict) else ""
+            parsed = urlparse(link)
+            link_host = (parsed.hostname or "").casefold()
+            if (parsed.scheme == "https" and not parsed.username and not parsed.password and parsed.port in {None, 443}
+                    and any(link_host == d or link_host.endswith("." + d) for d in domains)):
+                found.append(link)
+        return list(dict.fromkeys(found))
 
     async def read(self, url, domains):
         try:

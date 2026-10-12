@@ -45,13 +45,16 @@ def scoped_query(task, target, proposed):
         actual, expected = normalize_intake(parsed.entities.intake), normalize_intake(intake)
         if len(expected.split()) > 1 and actual != expected:
             raise ToolFailure("QUERY_SCOPE_REJECTED")
+    # Aliases inside the target's own name ("…Computer Science" within
+    # "…Computer Science and Engineering") are not a different programme.
+    others = re.sub(re.escape(target.program), " ", proposed, flags=re.I) if target.program else proposed
     if target.program and any(canonical_program(target.program) != canonical_program(p)
-                              for p in program_mentions(proposed)):
+                              for p in program_mentions(others)):
         raise ToolFailure("QUERY_SCOPE_REJECTED")
     if task.structured_filters.gre_policy == "not_required" and re.search(
             r"\bGRE\s+(?:is\s+)?(?:required|mandatory)\b|GRE必须|(?<!不)要求GRE", proposed, re.I):
         raise ToolFailure("QUERY_SCOPE_REJECTED")
-    anchor = " ".join(filter(None, [target.university, target.program, intake,
+    anchor = " ".join(filter(None, [target.university, target.program, normalize_intake(intake),
         {"US": "United States", "CA": "Canada", "UK": "United Kingdom", "AU": "Australia"}.get(task.entities.country, "")]))
     # Keep the anchors even when a long rewrite needs truncating. Avoid growth on replay.
     proposed = " ".join(proposed.split())
@@ -65,5 +68,7 @@ def initial_query(task, target, field=None):
     terms = {"deadline": "application deadline", "gre_policy": "GRE requirements optional not required",
              "language": "English language TOEFL IELTS requirements", "tuition": "tuition fees",
              "curriculum": "curriculum courses", "research": "research areas"}
-    hint = (" " + field + " official policy") if field else " " + " ".join(task.semantic_questions)
+    # Only structured anchors and field terms: the raw question (often another
+    # language, or naming several things) dilutes a domain-restricted search.
+    hint = " official policy" if field else ""
     return scoped_query(task, target, "official graduate admissions " + " ".join(terms.get(f, f) for f in fields) + hint)

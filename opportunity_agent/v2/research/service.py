@@ -70,7 +70,7 @@ class ResearchService:
         self.session = session
         self.catalog = ResearchCatalog(session)
         from .models import role_client
-        self.llm = llm if llm is not None else role_client('extract', seconds("RESEARCH_EXTRACT_TIMEOUT_SECONDS", 30, 300))
+        self.llm = llm if llm is not None else role_client('extract', seconds("RESEARCH_EXTRACT_TIMEOUT_SECONDS", 60, 300))
         if llm is None:
             if os.getenv("RESEARCH_EXTRACT_MODEL"):
                 self.llm.model = os.environ["RESEARCH_EXTRACT_MODEL"]
@@ -80,7 +80,8 @@ class ResearchService:
         # Optional semantic parsing must not consume the entire research budget.
         # Extraction retains its own existing timeout. Injected clients are kept
         # intact for tests/development; production parsing gets a bounded client.
-        self.parse_llm = llm if llm is not None else role_client('parse', 6)
+        self.parse_timeout = seconds("RESEARCH_PARSE_TIMEOUT_SECONDS", 20, 60)
+        self.parse_llm = llm if llm is not None else role_client('parse', self.parse_timeout)
         self.discovery_llm = llm if llm is not None else role_client('discovery', 10)
         self.retriever = retriever or HybridRetriever(session)
         self.web_factory = web_factory
@@ -134,7 +135,8 @@ class ResearchService:
                     with span("catalogue.identities"):
                         catalogue = await self.catalog.identities()
                     try:
-                        async with asyncio.timeout(7):
+                        # Own allowance: the parse model's request timeout plus thread/registry overhead.
+                        async with asyncio.timeout(getattr(self, "parse_timeout", 12) + 3):
                             task = await asyncio.to_thread(parse_task, request, catalogue, self.parse_llm)
                     except TimeoutError:
                         task = parse_task(request, catalogue)
@@ -161,8 +163,10 @@ class ResearchService:
                     sql_span.set_attribute("eligible_candidates", len(eligible))
                 result.diagnostics["catalogue_candidates"] = len(candidates)
                 result.diagnostics["eligible_candidates"] = len(eligible)
-                schools = {canonical_school(p.university) for p in self._web_targets(task, result, candidates)}
-                school_count = max(1, len(schools))
+                # Each school-programme target gets its own allowance; two programmes
+                # at one school must not split a single school's time.
+                school_count = max(1, len({(canonical_school(p.university), canonical_program(p.program))
+                                           for p in self._web_targets(task, result, candidates)}))
                 self._select_budget(result, school_count)
                 execution_span.set_attribute("research.budget_seconds", self._deadline - self._started)
                 result.diagnostics["candidate_fields"] = {
@@ -488,13 +492,20 @@ class ResearchService:
             targets = [ProgramResult(university=t.university, program=t.program, intake=task.entities.intake)
                        for t in task.entities.targets]
         elif task.entities.universities:
+            named = [p for p in (task.entities.programs or [task.entities.program]) if p]
             for school in task.entities.universities:
                 known = [p for p in candidates if canonical_school(p.university) == canonical_school(school)]
-                if known:
+                if named:
+                    # A user-named programme is the scope. Catalogue rows of other
+                    # programmes at the same school never stand in for it.
+                    for name in named:
+                        match = [p for p in known if canonical_program(p.program) == canonical_program(name)]
+                        targets.extend(match or [ProgramResult(university=school, program=name,
+                                                               intake=task.entities.intake)])
+                elif known:
                     targets.extend(known)
                 else:
-                    targets.extend(ProgramResult(university=school, program=p, intake=task.entities.intake)
-                                   for p in (task.entities.programs or [task.entities.program]))
+                    targets.append(ProgramResult(university=school, program="", intake=task.entities.intake))
         else:
             targets = candidates or [ProgramResult(university=task.entities.university,
                 program=task.entities.program, intake=task.entities.intake)]
@@ -675,8 +686,8 @@ class ResearchService:
         from .extraction import AdmissionExtraction, SYSTEM, candidate_blocks, CACHE, verify_fact
         remaining = min(getattr(self, "_deadline", float("inf")),
                         getattr(self, "_page_deadline", float("inf"))) - asyncio.get_running_loop().time()
-        timeout_budget = seconds("RESEARCH_COMPACT_EXTRACT_TIMEOUT_SECONDS", 20, 120) if profile == "compact" \
-            else seconds("RESEARCH_EXTRACT_TIMEOUT_SECONDS", 30, 300)
+        timeout_budget = seconds("RESEARCH_COMPACT_EXTRACT_TIMEOUT_SECONDS", 45, 180) if profile == "compact" \
+            else seconds("RESEARCH_EXTRACT_TIMEOUT_SECONDS", 60, 300)
         budget = min(remaining, timeout_budget)
         if budget <= 0:
             raise TimeoutError("extraction budget exhausted")

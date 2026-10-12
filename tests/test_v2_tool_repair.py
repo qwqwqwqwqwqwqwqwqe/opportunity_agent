@@ -39,7 +39,10 @@ def repair_config(monkeypatch):
     # These tests exercise the model-extraction repair path; the deterministic
     # keyword pass would otherwise resolve their fixture pages without the model.
     monkeypatch.setenv("RESEARCH_KEYWORD_EXTRACTION", "0")
-    monkeypatch.delenv("RESEARCH_PER_SCHOOL_SECONDS", raising=False)
+    # Budget-stop tests below count calls/seconds against explicit per-target caps.
+    monkeypatch.setenv("RESEARCH_TARGET_TOOL_LIMIT", "6")
+    monkeypatch.setenv("RESEARCH_TARGET_DECISION_LIMIT", "2")
+    monkeypatch.setenv("RESEARCH_PER_SCHOOL_SECONDS", "90")
 
 
 class Model:

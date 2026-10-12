@@ -11,7 +11,7 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from ...official_research import OfficialDomainRegistry, DynamicDomainCache
 from ..agents.contracts import ProgramResult
-from ..core.research_budget import estimate_school_count, school_seconds
+from ..core.research_budget import estimate_school_count, school_seconds, target_tool_limit
 from ..core.telemetry import span
 from .identity import canonical_school, canonical_program
 from .quality import field_supported, program_matches
@@ -30,6 +30,7 @@ class BoundedWebRunner:
         self.last_read_url = ""
         self.visited = []
         self.field_searches = []
+        self.mapped = []
         self.stop = False
         self.channel = hashlib.sha256(str((getattr(service.llm, "base_url", ""),
                                            getattr(service.llm, "model", "default"))).encode()).hexdigest()
@@ -40,14 +41,16 @@ class BoundedWebRunner:
 
     async def run(self):
         request = self.service._request
-        n = estimate_school_count(request.message, self.task.target_count)
+        targets = self.service._web_targets(self.task, self.result, self.candidates)
+        # The total cap covers every school-programme target, not just named schools.
+        n = max(estimate_school_count(request.message, self.task.target_count),
+                len({self.budget_key(t) for t in targets}))
         factory = getattr(self.service, "tool_ledger_factory", RedisToolLedger)
         self.ledger = factory(getattr(request, "user_id", ""), request.run_id, n,
                               getattr(request, "research_tool_state", {}))
         self.service._repair_active = True
         try:
             await self.ledger.initialize()
-            targets = self.service._web_targets(self.task, self.result, self.candidates)
             self.result.diagnostics["web_target_count"] = len(targets)
             if not targets or self.ledger.state.get("blocked"):
                 return
@@ -60,7 +63,9 @@ class BoundedWebRunner:
                         break
                     self.target = target
                     self.target_id = self.service._target_key(target)
-                    self.school = canonical_school(target.university)
+                    # Per school-programme allowance: sibling programmes at one school
+                    # must not exhaust each other's calls.
+                    self.school = self.budget_key(target)
                     record = OfficialDomainRegistry().resolve(target.university) or DynamicDomainCache().get(target.university)
                     self.domains = record["domains"] if record else []
                     if not self.domains:
@@ -86,6 +91,7 @@ class BoundedWebRunner:
                     self.visited = saved.get("visited", [])
                     self.observations = [ToolObservation.model_validate(o) for o in saved.get("observations", [])]
                     self.field_searches = saved.get("field_searches", [])
+                    self.mapped = saved.get("mapped", [])
                     for p in saved.get("programs", []):
                         restored = ProgramResult.model_validate(p)
                         if not any(v.identity == restored.identity for v in self.result.programs):
@@ -129,8 +135,8 @@ class BoundedWebRunner:
                 self.result.diagnostics["tool_targets_exhausted"] = bool(targets) and all(
                         self.ledger.state.get("targets", {}).get(self.service._target_key(t), {}).get("finished")
                         or
-                        self.ledger.state["schools"].get(canonical_school(t.university), {}).get("tools", 0) >= 6
-                        or self.ledger.state["schools"].get(canonical_school(t.university), {}).get("seconds", 0) >= school_seconds()
+                        self.ledger.state["schools"].get(self.budget_key(t), {}).get("tools", 0) >= target_tool_limit()
+                        or self.ledger.state["schools"].get(self.budget_key(t), {}).get("seconds", 0) >= school_seconds()
                         or any(self.matches_target(p, t) and all(field_supported(p, f, self.task.structured_filters, self.task.as_of)
                             for f in self.task.requested_fields if f not in {"curriculum", "research"})
                             and program_matches(p, self.task.structured_filters, self.task.as_of) for p in self.result.programs)
@@ -150,19 +156,65 @@ class BoundedWebRunner:
             "candidate_refs": self.candidate_refs, "last_read_url": self.last_read_url,
             "visited": self.visited,
             "observations": [o.model_dump() for o in self.observations[-4:]],
-            "field_searches": self.field_searches, "finished": finished,
+            "field_searches": self.field_searches, "mapped": self.mapped, "finished": finished,
             "programs": [p.model_dump(mode="json") for p in self.result.programs if self.matches_target(p)],
             "next_action": action.model_dump() if action else None}, finished=finished, reason=reason)
+
+    @staticmethod
+    def budget_key(target):
+        return canonical_school(target.university) + "|" + canonical_program(target.program)
+
+    @staticmethod
+    def page_key(url):
+        """www./non-www. and trailing-slash variants are one page."""
+        p = urlsplit(url)
+        host = (p.hostname or "").casefold().removeprefix("www.")
+        return host + (p.path.rstrip("/") or "/") + ("?" + p.query if p.query else "")
+
+    def seen(self, url):
+        key = self.page_key(url)
+        return any(self.page_key(v) == key for v in self.visited)
 
     def next_candidate(self):
         while self.pending:
             url = self.pending.pop(0)
-            if url not in self.visited:
+            if not self.seen(url):
                 return RepairDecision(action="call_tool", tool="read_official_page", arguments=ToolArguments(url=url))
         return None
 
+    def ranked_links(self, links, keep=3):
+        """Order sub-links of a verified programme page by admissions relevance of their path.
+
+        Only the URL is available here; each page is still read, identity-checked
+        and verified like any search result.
+        """
+        from ...official_research import program_name_words
+        from .extraction import declared_abbreviations, _same_subject
+        name = set(program_name_words(self.target.program)) - {"and", "of", "in", "the", "for"}
+        # Abbreviations the programme's own pages declare ("… Engineering (CSE)") identify its sub-pages.
+        for page in self.pages.values():
+            for abbr, full in declared_abbreviations(page.get("text", "")[:20000] + "\n" + page.get("title", "")).items():
+                if _same_subject(self.target.program, full) or program_name_words(full) == program_name_words(self.target.program):
+                    name.add(abbr.casefold())
+        fields = {"deadline": "deadline dates apply application", "gre_policy": "gre requirements admission",
+                  "tuition": "tuition cost fees", "language": "english toefl ielts language"}
+        wanted = {"admission", "admissions", "apply", "application", "requirements", "prospective", "deadlines",
+                  *" ".join(fields.get(f, "") for f in self.task.requested_fields).split()}
+        scored = []
+        for link in links:
+            if self.seen(link) or any(self.page_key(p.get("url", "")) == self.page_key(link) for p in self.pages.values()):
+                continue
+            words = set(re.findall(r"[a-z0-9]+", urlsplit(link).path.casefold()))
+            # Requirements/application paths first; the programme name breaks ties
+            # but alone (an overview page) never outranks an admissions page.
+            hits, named = len(words & wanted), bool(words & name)
+            score = 3 * hits + (2 if named else 0) + (2 if hits and named else 0)
+            if score and not re.search(r"\.(?:pdf|jpg|png|zip|docx?)$|/(?:news|events?|people|faculty)/", link, re.I):
+                scored.append((score, link))
+        return [link for _, link in sorted(scored, key=lambda s: -s[0])[:keep]]
+
     def ranked_candidates(self, results):
-        from ...official_research import classify_program_page
+        from ...official_research import classify_program_page, program_identity, program_name_words
         ranked = {}
         for item in results[:5]:
             url = item.get("url", "")
@@ -177,7 +229,17 @@ class BoundedWebRunner:
                     continue
                 # Only construct HTTPS candidates; the reader must still validate DNS and redirects.
                 url = urlunsplit(("https", p.netloc.lower(), p.path, p.query, ""))
-                match, _, _ = classify_program_page(self.target.program, str(item.get("title", "")), url, str(item.get("content", ""))[:1000])
+                title, snippet = str(item.get("title", "")), str(item.get("content", ""))[:1000]
+                match, _, _ = classify_program_page(self.target.program, title, url, snippet)
+                if self.target.program and match != "exact" and not program_identity(self.target.program):
+                    # No registry identity to classify against: require the name
+                    # itself in the result before spending a page read on it.
+                    words = program_name_words(self.target.program)
+                    # A one-word subject ("Analytics") is too weak to filter on.
+                    named = len(words) < 2 or re.search(r"(?<![a-z0-9])" + r"[^a-z0-9]+".join(map(re.escape, words))
+                        + r"(?![a-z0-9])", " ".join(re.findall(r"[a-z0-9]+", (title + " " + snippet).casefold().replace("&", " and "))))
+                    if not named:
+                        match = "rejected"
                 if self.target.program and match != "exact":
                     self.result.diagnostics.setdefault("unverified_candidates", []).append({
                         "university": self.target.university, "program": self.target.program,
@@ -275,7 +337,12 @@ class BoundedWebRunner:
         supplied = args.model_dump(exclude_defaults=True)
         allowed = {"search_official_pages": {"query"}, "validate_official_url": {"url"},
             "read_official_page": {"url"}, "extract_official_page": {"url"},
-            "extract_program_facts": {"page_ref", "fields", "profile"}}[decision.tool]
+            "extract_program_facts": {"page_ref", "fields", "profile"},
+            "map_official_site": {"page_ref"}}[decision.tool]
+        if decision.tool == "map_official_site":
+            # Only a page already read and verified for this target can be mapped.
+            if args.page_ref not in self.pages or self.pages[args.page_ref]["target_id"] != self.target_id:
+                raise ToolFailure("UNKNOWN_PAGE_REFERENCE")
         if decision.tool in {"validate_official_url", "read_official_page", "extract_official_page"}:
             allowed.add("candidate_ref")
             if args.candidate_ref:
@@ -339,6 +406,7 @@ class BoundedWebRunner:
         try:
             with span("research.tool", tool=tool, call_id=call_id, target_id=self.target_id) as tool_span:
                 await self.emit({"search_official_pages": "search", "read_official_page": "read",
+                    "map_official_site": "search",
                     "extract_official_page": "read_fallback", "extract_program_facts": "extract"}.get(tool, "repair_validate"), tool)
                 self.web.request_deadline = asyncio.get_running_loop().time() + remaining
                 self.web.request_timeout_seconds = min(20, remaining)
@@ -349,10 +417,21 @@ class BoundedWebRunner:
                         urls = self.ranked_candidates(data.get("results", []))
                         if not urls:
                             raise ToolFailure("NO_RELEVANT_RESULTS")
+                        if all(self.seen(u) for u in urls):
+                            # Same pages as before: a different strategy is needed, not a replay.
+                            raise ToolFailure("NO_NEW_RESULTS")
                         # Domain restriction is also enforced again before any read.
                         self.pending = urls
                         observation.data = {"candidates": [{"candidate_ref": ref, "url": safe_url(v["url"]),
                             "title": v["title"], "snippet": v["snippet"]} for ref, v in self.candidate_refs.items() if v["url"] in urls]}
+                    elif tool == "map_official_site":
+                        self.mapped.append(args.page_ref)
+                        links = await self.web.map(self.pages[args.page_ref]["url"], self.domains)
+                        urls = self.ranked_links(links)
+                        if not urls:
+                            raise ToolFailure("NO_PROGRAM_LINKS")
+                        self.pending = list(dict.fromkeys(urls + self.pending))
+                        observation.data = {"candidates": [{"url": safe_url(u)} for u in urls]}
                     elif tool == "validate_official_url":
                         observation.data = await self.web.validate_url(args.url, self.domains)
                     elif tool in {"read_official_page", "extract_official_page"}:
@@ -421,13 +500,16 @@ class BoundedWebRunner:
         if tool == "read_official_page" and code in {"TRANSPORT_FAILURE", "HTTP_403", "HTTP_429", "HTTP_502", "HTTP_503", "HTTP_504", "NO_READABLE_CONTENT"}:
             return ["extract_official_page", "search_official_pages", "skip_target"]
         if tool == "extract_program_facts":
-            return ["extract_program_facts", "read_official_page", "search_official_pages", "skip_target"]
+            return ["extract_program_facts", "map_official_site", "read_official_page", "search_official_pages", "skip_target"]
+        if code == "NO_NEW_RESULTS":
+            # Replaying a search that only returns already-read pages is not a repair.
+            return ["map_official_site", "skip_target"]
         return ["search_official_pages", "skip_target"]
 
     def follow_success(self, action, observation):
         if self.complete():
             return None
-        if action.tool in {"search_official_pages", "extract_program_facts"}:
+        if action.tool in {"search_official_pages", "extract_program_facts", "map_official_site"}:
             return self.next_candidate()
         if action.tool == "validate_official_url":
             return RepairDecision(action="call_tool", tool="read_official_page", arguments=ToolArguments(url=action.arguments.url))
@@ -453,7 +535,7 @@ class BoundedWebRunner:
         while True:
             remaining = self.remaining()
             entry = self.ledger.state["schools"].get(self.school, {})
-            if self.ledger.state["tools_used"] >= self.ledger.state["tool_limit"] or entry.get("tools", 0) >= 6:
+            if self.ledger.state["tools_used"] >= self.ledger.state["tool_limit"] or entry.get("tools", 0) >= target_tool_limit():
                 await self.record_gate(ToolFailure("TOOL_BUDGET_EXHAUSTED"))
                 return None
             try:
@@ -486,7 +568,9 @@ class BoundedWebRunner:
                         "read_official_page": {"candidate_ref": "candidate ID from observations, or official HTTPS url"},
                         "extract_official_page": {"candidate_ref": "candidate ID from observations, or official HTTPS url"},
                         "extract_program_facts": {"page_ref": "required reference from observations",
-                            "fields": self.task.requested_fields, "profile": "standard or compact; compact <=2 fields"}},
+                            "fields": self.task.requested_fields, "profile": "standard or compact; compact <=2 fields"},
+                        "map_official_site": {"page_ref": "reference of a read page verified as this programme; "
+                                              "discovers its admissions/requirements sub-pages"}},
                     "observations": [o.model_dump() for o in self.observations[-4:]],
                     "successful_fields": [f.field for p in self.result.programs if self.matches_target(p)
                         for f in p.facts if f.verification_status == "verified"],
@@ -576,6 +660,9 @@ class BoundedWebRunner:
         action = self.next_candidate()
         if action:
             return action
+        if observation.error_code == "NO_NEW_RESULTS":
+            # Searching again already returned only read pages; another search is a replay.
+            return RepairDecision(action="skip_target")
         # A bounded field-specific search is different from replaying the failed initial search.
         for field in self.task.requested_fields:
             if field not in self.field_searches and not any(self.matches_target(p) and field_supported(p, field,
@@ -583,6 +670,23 @@ class BoundedWebRunner:
                 self.field_searches.append(field)
                 return RepairDecision(action="call_tool", tool="search_official_pages", arguments=ToolArguments(query=initial_query(self.task, self.target, field)))
         return RepairDecision(action="skip_target")
+
+    def exact_unmapped_page(self):
+        """Most recent page read for this target whose identity is the target programme."""
+        from ...official_research import classify_program_page
+        if not self.target.program or "tavily_map" not in getattr(self.web, "tools", {}):
+            return ""
+        if self.mapped and self.pending:
+            # One map already queued this programme's sub-pages; read those first.
+            return ""
+        for observation in reversed(self.observations):
+            ref = observation.data.get("page_ref", "") if observation.status == "ok" else ""
+            page = self.pages.get(ref)
+            if (page and ref not in self.mapped and page.get("target_id") == self.target_id
+                    and classify_program_page(self.target.program, page.get("title", ""), page["url"],
+                                              page.get("text", ""))[0] == "exact"):
+                return ref
+        return ""
 
     def deterministic_repair(self, observation):
         if observation.error_code == "HTTPS_REQUIRED":
@@ -597,7 +701,19 @@ class BoundedWebRunner:
             url = getattr(self, "last_read_url", "")
             if url:
                 return RepairDecision(action="call_tool", tool="extract_official_page", arguments=ToolArguments(url=url))
+        # PROGRAM_MISMATCH included: facts on a verified programme page can fail
+        # grounding when they are delegated elsewhere ("deadlines vary by home unit").
+        # exact_unmapped_page only returns pages whose identity is this programme.
+        if observation.error_code in {"MISSING_FIELDS", "NO_SUPPORTED_FACTS", "NO_NEW_RESULTS", "PROGRAM_MISMATCH"}:
+            # Programme facts often live on sibling pages (admissions, deadlines)
+            # under the verified programme page: discover them before searching again.
+            ref = self.exact_unmapped_page()
+            if ref:
+                return RepairDecision(action="call_tool", tool="map_official_site", arguments=ToolArguments(page_ref=ref))
+            if observation.error_code == "NO_NEW_RESULTS":
+                return self.next_candidate()  # None -> planner, whose fallback skips
         if observation.error_code in {"PROGRAM_MISMATCH", "INTAKE_UNSUPPORTED", "NO_SUPPORTED_FACTS", "MISSING_FIELDS",
+                "NO_PROGRAM_LINKS",
                 "EXTRACTION_CIRCUIT_OPEN",
                 "OFFICIAL_DOMAIN_REJECTED", "PRIVATE_ADDRESS_REJECTED", "TLS_REJECTED", "PORT_REJECTED"}:
             return self.next_candidate()
