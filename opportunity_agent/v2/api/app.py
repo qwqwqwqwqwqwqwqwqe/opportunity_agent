@@ -64,8 +64,6 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Opportunity Agent V2", version="2.0.0", lifespan=lifespan)
-from ..workbench.api import router as workspace_router
-app.include_router(workspace_router)
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:8766", "http://localhost:8766"],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -353,7 +351,6 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
                 # Release the event counter row before the asynchronous event
                 # writer starts; otherwise PostgreSQL/SQLite can deadlock.
                 await session.commit()
-                initial['workspace_mode'] = __import__('os').getenv('APPLICATION_WORKSPACE_ENABLED', '1') == '1'
                 state = await orchestrator.ainvoke(initial, event_queue=event_queue)
             await event_queue.join()
             await session.refresh(run)
@@ -693,14 +690,6 @@ async def get_approval(approval_id: str, user: CurrentUser, session: DBSession) 
 
 @app.post("/api/v1/applications", status_code=status.HTTP_202_ACCEPTED)
 async def propose_application(body: ApplicationCreate, user: CurrentUser, session: DBSession) -> dict:
-    if body.project_id:
-        from ..workbench.schemas import Command
-        from ..workbench.api import select_project
-        if not body.request_id:
-            raise HTTPException(422,'从项目库加入申请需要 request_id')
-        return await select_project(body.project_id,Command(request_id=body.request_id,expected_version=body.expected_version),user,session)
-    if not body.university or not body.program:
-        raise HTTPException(422,'必须指定学校和项目，或确认的项目库ID')
     approval = await ApplicationCommandService(session).propose(user.id, "application.create", body.model_dump(mode="json"),
                                                                   request_id=f"application:{body.university}:{body.program}:{body.intake}")
     await session.commit()

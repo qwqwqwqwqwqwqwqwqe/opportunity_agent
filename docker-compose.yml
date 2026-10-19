@@ -4,7 +4,6 @@ x-python-build: &python-build
     PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
 
 x-research-budget: &research-budget
-  APPLICATION_WORKSPACE_ENABLED: ${APPLICATION_WORKSPACE_ENABLED:-1}
   RESEARCH_PROGRESS_ENABLED: ${RESEARCH_PROGRESS_ENABLED:-1}
   RESEARCH_TOOL_REPAIR_ENABLED: ${RESEARCH_TOOL_REPAIR_ENABLED:-0}
   RESEARCH_PER_SCHOOL_SECONDS: ${RESEARCH_PER_SCHOOL_SECONDS:-}
@@ -58,8 +57,6 @@ services:
     build: *python-build
     environment:
       <<: [*research-budget, *llm-provider]
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_FROM: ${SMTP_FROM:-}
       DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random secret}
@@ -167,18 +164,7 @@ services:
     command: ["python", "-m", "opportunity_agent.v2.worker"]
     environment:
       <<: *llm-provider
-      PROJECT_IMPORT_MODEL: ${PROJECT_IMPORT_MODEL:-}
-      PROJECT_IMPORT_OUTPUT_MODE: ${PROJECT_IMPORT_OUTPUT_MODE:-prompt}
-      PROJECT_IMPORT_TIMEOUT_SECONDS: ${PROJECT_IMPORT_TIMEOUT_SECONDS:-60}
-      PROJECT_IMPORT_CONTEXT_CHARS: ${PROJECT_IMPORT_CONTEXT_CHARS:-20000}
-      PROJECT_IMPORT_MAX_MODEL_CALLS: ${PROJECT_IMPORT_MAX_MODEL_CALLS:-3}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_FROM: ${SMTP_FROM:-}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_SSL: ${SMTP_SSL:-0}
       RESEARCH_EXTRACT_MODEL: ${RESEARCH_EXTRACT_MODEL:-}
       RESEARCH_EXTRACT_REASONING_EFFORT: ${RESEARCH_EXTRACT_REASONING_EFFORT:-}
       DATABASE_URL: postgresql+asyncpg://opportunity:opportunity_dev_only@postgres:5432/opportunity_agent

@@ -33,7 +33,6 @@ async def run_ingestion() -> None:
 
 
 async def run() -> None:
-    from .workbench.worker import run_workspace_worker
     # Preference durability is in PostgreSQL; a Redis outage must not stop it.
     async def resilient_ingestion():
         while True:
@@ -42,7 +41,6 @@ async def run() -> None:
             except Exception:
                 await asyncio.sleep(5)
     async with asyncio.TaskGroup() as group:
-        group.create_task(run_workspace_worker(SessionLocal))
         group.create_task(resilient_ingestion())
         group.create_task(run_memory_worker(SessionLocal))
 

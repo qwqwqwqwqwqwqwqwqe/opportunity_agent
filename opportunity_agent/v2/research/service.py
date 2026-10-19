@@ -100,9 +100,6 @@ class ResearchService:
         self.threshold = threshold
 
     async def execute(self, request):
-        if getattr(request, 'workspace_mode', False):
-            from ..workbench.research import execute_library
-            return await execute_library(self.session, request)
         self._request = request
         self.progress = ResearchProgress(getattr(request, "progress_channel", ""))
         result = ResearchResult(task_id=request.request_id)

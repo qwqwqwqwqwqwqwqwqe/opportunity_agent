@@ -566,14 +566,6 @@ class DeterministicSynthesizer:
         if state.profile_result and state.profile_result.proposals:
             return "我已识别到可更新的画像或申请进展，并生成待确认变更；确认前不会修改长期状态。"
         if state.research_result:
-            if state.research_result.diagnostics.get('workspace'):
-                rows = state.research_result.diagnostics['recommendation']['results']
-                if not rows:
-                    return '我的项目库暂无匹配资料。请先在项目库导入并确认项目；不会自动联网搜索。'
-                return '查询范围：我的项目库（用户确认资料，非录取概率）\n\n' + '\n\n'.join(
-                    f"{r['university']} — {r['program']}（版本 {r['project_version']}）\n" +
-                    '\n'.join(f"- {k}：{v['value'] if v['status'] != '待核对' else '待确认'}" for k,v in r['requirements'].items())
-                    for r in rows)
             from ..research.quality import field_supported, usable
             research = state.research_result
             criteria = state.success_criteria or SuccessCriteria(evidence_required=True)
@@ -742,7 +734,6 @@ described as replacing the user's current roadmap."""
         if not self.client.enabled:
             raise SynthesizerUnavailable("LLM Synthesizer is not configured; set LLM_API_KEY before starting the API")
         context = {
-            'workspace_policy': 'When research task_type is library_qa/project_match, use ONLY user-confirmed project data. Never override with raw historical pages. Unknown is not satisfied. Explain matching experiences and do not invent admission probability. Source is user-confirmed, not independently official-verified.',
             "user_message": state.message,
             "route_decision": state.route_decision.model_dump(mode="json") if state.route_decision else None,
             "relevant_memory": state.memory,
@@ -940,8 +931,6 @@ class CustomOrchestrator:
                     preference_memory=state.preference_memory.model_dump(mode="json"))
             else:
                 state.success_criteria = await self.goal_parser.parse(goal_message)
-        if state.workspace_mode and 'research' in forced_agents:
-            state.success_criteria = SuccessCriteria(evidence_required=True)
         if state.success_criteria:
             state.success_criteria.memory_constraints = []  # Provenance comes from the service, not model claims.
             if is_policy_impact_question(state.message):
@@ -1159,15 +1148,6 @@ class CustomOrchestrator:
 
     @staticmethod
     def _check_completion(state: ExecutionState) -> CompletionResult:
-        if state.research_result and state.research_result.diagnostics.get('workspace') and not state.agent_failures:
-            if state.profile_result and state.profile_result.status in {'failed','partial'}:
-                return CompletionResult(status='PARTIAL',reasons=['画像更新未完成；保留本地检索结果。'])
-            if state.profile_result and state.profile_result.conflicts:
-                return CompletionResult(status='NEED_USER', reasons=['请确认画像信息冲突。'])
-            if state.plan_result and state.plan_result.status == 'failed':
-                return CompletionResult(status='PARTIAL', reasons=['计划未完成；已保留本地检索结果。'])
-            return CompletionResult(status='PASS' if state.research_result.findings else 'PARTIAL',
-                reasons=[] if state.research_result.findings else ['本人项目库暂无匹配资料，请导入并确认。'])
         criteria = state.success_criteria
         if criteria and criteria.needs_user_input:
             return CompletionResult(status="NEED_USER", reasons=criteria.needs_user_input)

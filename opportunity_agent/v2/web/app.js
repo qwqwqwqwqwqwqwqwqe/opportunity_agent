@@ -85,8 +85,8 @@
     if (!response.ok) { const data=await response.json().catch(()=>({})); throw Error(data.detail||`请求失败 (${response.status})`); }
     return response.status===204 ? null : response.json();
   }
-  function showAuth() { ui.app.hidden=true; ui.auth.hidden=false; state.user=null; document.dispatchEvent(new CustomEvent('workspace-reset')); }
-  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; document.dispatchEvent(new CustomEvent('workspace-chat')); }
+  function showAuth() { ui.app.hidden=true; ui.auth.hidden=false; state.user=null; }
+  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; }
   async function loadInitial() {
     try { state.user=await request('/auth/me'); showApp(); await Promise.all([loadConversations(),loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]); }
     catch (error) { if (!state.user) showAuth(); else toast(error.message); }
@@ -304,8 +304,6 @@
           if(state.conversationId===conversationId){
             showRunInfo(id,run.trace_id);ui.steps.textContent=terminalStatus;
             showRunDiagnostics(id,run.failure_report);showSources(run);
-            if(typeof document.dispatchEvent==='function' && typeof CustomEvent==='function')
-              document.dispatchEvent(new CustomEvent('workspace-results',{detail:run}));
             if(run.status==='failed'){renderDraft('');showRunFailure(id,run.error,message);}
             else if(run.answer){
               if(draft)draft.innerHTML=`<div class="meta">助手</div>${markdown(run.answer)}`;
@@ -426,7 +424,7 @@
   $('auth-form').onsubmit=async event=>{event.preventDefault();try{const result=await request('/auth/'+state.authMode,{method:'POST',body:JSON.stringify({email:$('email').value,password:$('password').value})});state.user=result.user;showApp();await Promise.all([loadConversations(),loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]);}
     catch(error){$('auth-error').textContent=error.message;}};
   $('logout').onclick=async()=>{await request('/auth/logout',{method:'POST'}).catch(()=>{});showAuth();};
-  $('new-conversation').onclick=()=>{document.dispatchEvent(new CustomEvent('workspace-chat'));createConversation().catch(error=>toast(error.message));};
+  $('new-conversation').onclick=()=>createConversation().catch(error=>toast(error.message));
   // Consolidation proposals can arrive after run_completed; refresh while idle.
   setInterval(()=>{if(state.user&&!state.running&&document.visibilityState==='visible')loadApprovals().catch(()=>{});},10000);
   $('memory-view').onclick=async event=>{
@@ -436,7 +434,7 @@
     catch(error){toast(error.message);}
     finally{await loadMemory().catch(error=>toast(error.message));}
   };
-  ui.conversations.onclick=event=>{const button=event.target.closest('[data-conversation]');if(button){document.dispatchEvent(new CustomEvent('workspace-chat'));openConversation(button.dataset.conversation).catch(error=>toast(error.message));}};
+  ui.conversations.onclick=event=>{const button=event.target.closest('[data-conversation]');if(button)openConversation(button.dataset.conversation).catch(error=>toast(error.message));};
   $('chat-form').onsubmit=event=>{event.preventDefault();const input=$('chat-input'),message=input.value.trim();if(message){input.value='';sendMessage(message);}};
   $('chat-input').onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}};
   ui.profile.onclick=event=>{if(event.target.id==='edit-profile')editProfile();};

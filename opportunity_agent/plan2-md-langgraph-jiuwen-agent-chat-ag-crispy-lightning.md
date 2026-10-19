@@ -1,7 +1,5 @@
 # V2.2 重构计划：Custom Orchestrator + jiuwen 多 Agent + RAG + 记忆 + 独立 Synthesizer
 
-> 2026-10-15 产品边界更新：以 [申请小助手计划](../docs/application-assistant-plan.md) 为新的默认业务路径。用户按项目提供网址，正文提取与模型整理仅产生待确认草稿；用户发布后进入独立私有项目池。Research执行library_qa/project_match，Planning生成已选申请的待确认清单，表单打勾由后端确定性写入，日历与站内／邮件提醒由Worker执行。旧全网招生查询保留为实验模式，不再是工作台的默认查询或失败兜底。旧数据及本文件原历史设计保留，不自动迁移。
-
 ## Context
 
 `opportunity_agent/plan2.md` 规划了面试级 V2 系统，但选定 LangGraph 作为编排运行时。本计划以 `opportunity_agent_v2_2_plan.md` 和最新架构图为依据：Custom Python Orchestrator 负责确定性控制，openJiuwen 用于 Router 和领域 Agent；本阶段不加入在线评估 Agent 或 Answer Validator，离线评测与可观测性仍保留。

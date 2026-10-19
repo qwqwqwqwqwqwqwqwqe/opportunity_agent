@@ -265,8 +265,6 @@ class AgentFailure(BaseModel):
 
 
 class ExecutionState(BaseModel):
-    workspace_mode: bool = False
-    workspace_query: dict[str,Any] = Field(default_factory=dict)
     _event_queue: Any = PrivateAttr(default=None)
     _execution_deadline: float | None = PrivateAttr(default=None)
     _execution_scope: Any = PrivateAttr(default=None)

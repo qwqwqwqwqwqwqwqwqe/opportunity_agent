@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Opportunity Agent V2</title>
-  <link rel="stylesheet" href="/v2/assets/style.css?v=workspace-navigation-2">
+  <link rel="stylesheet" href="/v2/assets/style.css">
 </head>
 <body>
   <div id="auth" class="auth-shell">
@@ -20,13 +20,6 @@
   </div>
 
   <div id="app" class="app-shell" hidden>
-    <nav class="workspace-nav" aria-label="申请工作台">
-      <button type="button" data-workspace="chat" class="active" aria-current="page">聊天</button>
-      <button type="button" data-workspace="library">项目库</button>
-      <button type="button" data-workspace="calendar">日程表与提醒</button>
-      <button type="button" data-workspace="todo">申请 To-do</button>
-      <button type="button" data-workspace="background">个人背景与经历</button>
-    </nav>
     <aside class="left-panel">
       <div class="brand">✦ Opportunity Agent <small>V2</small></div>
       <button id="new-conversation" class="primary">＋ 新对话</button>
@@ -34,16 +27,14 @@
       <div class="account"><span id="account-email"></span><button id="logout" class="link-button">退出</button></div>
     </aside>
 
-    <main class="chat-panel" id="chat-panel">
+    <main class="chat-panel">
       <header><button class="mobile-panel" data-panel="left">☰</button><div><strong id="conversation-title">新对话</strong><small id="run-status">准备就绪</small></div><button class="mobile-panel" data-panel="right">资料</button></header>
       <div id="messages" class="messages" aria-live="polite"></div>
         <div id="run-steps" class="run-steps" aria-live="polite"></div>
         <div id="run-info" class="hint" aria-live="polite"></div>
         <div id="run-diagnostics" class="run-diagnostics" hidden></div>
-      <p class="hint">查询范围：我的项目库 · 未确认草稿不参与检索</p>
-      <form id="chat-form" class="composer"><textarea id="chat-input" rows="2" placeholder="询问本地项目信息、根据经历推荐项目，或调整申请计划…" required></textarea><button class="primary" type="submit">发送</button></form>
+      <form id="chat-form" class="composer"><textarea id="chat-input" rows="2" placeholder="说说你的背景、申请进展，或让助手生成计划…" required></textarea><button class="primary" type="submit">发送</button></form>
     </main>
-    <main id="workspace-panel" class="workspace-panel" hidden></main>
 
     <aside class="right-panel">
       <div class="tabs" role="tablist"><button data-tab="profile" class="active">画像</button><button data-tab="plan">计划</button><button data-tab="memory">偏好</button><button data-tab="approvals">待确认 <span id="approval-count"></span></button></div>
@@ -57,8 +48,6 @@
   <dialog id="profile-dialog"><form id="profile-form"><h2>编辑画像</h2><div id="profile-fields" class="field-grid"></div><p class="hint">保存后请在待确认中审阅变更。</p><div class="dialog-actions"><button type="button" id="profile-cancel">取消</button><button class="primary" type="submit">保存</button></div></form></dialog>
   <dialog id="conflict-dialog" aria-labelledby="conflict-title"><h2 id="conflict-title">确认画像信息</h2><p class="hint">新信息与当前画像不同。选择后直接保存，无需在聊天中回复 A/B。</p><p id="conflict-error" role="alert" hidden></p><div id="conflict-items"></div><button id="conflict-later">稍后处理</button></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
-  <dialog id="workspace-dialog" class="workspace-dialog"></dialog>
-  <script src="/v2/assets/app.js?v=workspace-navigation-2" defer></script>
-  <script src="/v2/assets/workspace.js?v=application-workspace-4" defer></script>
+  <script src="/v2/assets/app.js?v=tool-repair-20261010" defer></script>
 </body>
 </html>

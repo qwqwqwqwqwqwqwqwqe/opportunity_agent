@@ -8,7 +8,6 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Strin
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, Timestamped, UUIDPrimaryKey
-from ..workbench import models as workspace_models  # register isolated user project tables
 
 Json = dict[str, Any]
 

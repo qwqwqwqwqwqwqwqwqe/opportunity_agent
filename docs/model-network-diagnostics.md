@@ -1,5 +1,7 @@
 # 模型网络错误诊断
 
+> 2026-10-19：申请助手导入功能已撤回。下文导入相关段落为历史诊断记录；当前仅通用模型传输日志及Luna温度兼容继续生效，不再产生workspace_import_outcome。
+
 ## Luna导入兼容（2026-10-17）
 
 实际网关对 gpt-6-luna 的 temperature=0 返回400 unsupported_value。统一请求层对该精确模型名省略temperature（普通、结构化和流式均适用），其它模型保持原参数，不靠额外失败请求来探测能力。CMU课程页实测还出现4000个completion tokens全部为reasoning、content为空且finish_reason=length，因此导入提取在未显式设置推理档时对Luna默认low。历史失败提示在新整理时清除；本次输出为空/非法与超时单独分类，不再都显示网络错误。
