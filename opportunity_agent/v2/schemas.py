@@ -48,8 +48,11 @@ class RunSummary(RunCreated):
 
 
 class ApplicationCreate(BaseModel):
-    university: str = Field(min_length=1, max_length=200)
-    program: str = Field(min_length=1, max_length=200)
+    project_id: str | None = None
+    request_id: str | None = Field(default=None,max_length=128)
+    expected_version: int = Field(default=1,ge=1)
+    university: str = Field(default='', max_length=200)
+    program: str = Field(default='', max_length=200)
     intake: str = Field(default="", max_length=40)
     deadline: datetime | None = None
 

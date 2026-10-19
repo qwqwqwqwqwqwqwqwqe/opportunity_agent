@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Strin
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, Timestamped, UUIDPrimaryKey
+from ..workbench import models as workspace_models  # register isolated user project tables
 
 Json = dict[str, Any]
 
@@ -204,7 +205,12 @@ class ResearchProgram(UUIDPrimaryKey, Timestamped, Base):
     intake: Mapped[str] = mapped_column(String(40))
     country: Mapped[str] = mapped_column(String(80), default="")
     aliases: Mapped[list] = mapped_column(JSON, default=list)
-    __table_args__ = (UniqueConstraint("university", "program", "intake", name="uq_research_program_identity"),)
+    degree: Mapped[str] = mapped_column(String(32), default='', server_default='')
+    degree_award: Mapped[str] = mapped_column(String(32), default='', server_default='')
+    home_unit: Mapped[str] = mapped_column(String(200), default='', server_default='')
+    program_subject: Mapped[str] = mapped_column(String(200), default='', server_default='')
+    __table_args__ = (UniqueConstraint("university", "program", "intake", "degree", "degree_award", "home_unit",
+                                     name="uq_research_program_identity"),)
 
 
 class ResearchRequirement(UUIDPrimaryKey, Timestamped, Base):

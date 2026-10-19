@@ -329,6 +329,9 @@ class OnboardingProfileInput(BaseModel):
     skills: list[str] = Field(default_factory=list)
     hardware_skills: list[str] = Field(default_factory=list)
     research_experiences: list[str] = Field(default_factory=list)
+    experiences: list[dict] = Field(default_factory=list)
+    language_exams: list[dict] = Field(default_factory=list)
+    gre_exam_date: date | None = None
     competition_experiences: list[str] = Field(default_factory=list)
     project_experiences: list[str] = Field(default_factory=list)
     paper_experiences: list[str] = Field(default_factory=list)

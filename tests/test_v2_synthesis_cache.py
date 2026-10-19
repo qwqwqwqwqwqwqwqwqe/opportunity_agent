@@ -266,7 +266,8 @@ def test_first_web_lookup_commits_and_second_session_uses_sql(tmp_path, monkeypa
             async with factory() as session:
                 first = await ResearchService(session, llm=Model(), web_factory=Web).execute(request())
                 assert first.status == "complete", first.model_dump()
-                assert first.diagnostics["persisted_facts"] == 1
+                assert first.diagnostics.get("persisted_facts") == 1, {k:first.diagnostics.get(k) for k in
+                    ('persist_errors','web_field_rejections','extraction_attempts')}
             async with factory() as session:
                 second = await ResearchService(session, llm=Model(), web_factory=ForbiddenWeb).execute(request())
                 assert second.status == "complete", second.model_dump()

@@ -39,11 +39,25 @@ def field_supported(program: ProgramResult, field: str, criteria: SuccessCriteri
         if field == "gre_policy":
             return fact.value == program.gre_policy
         return True
+    def scope_compatible(e):
+        from .extraction import VERSION
+        if e.extraction_provenance.get('version') and e.extraction_provenance['version'] != VERSION:
+            return False
+        if not (program.degree or program.home_unit):
+            return True  # Historical unscoped results stay readable.
+        from .identity import identity_text
+        proof = e.extraction_provenance
+        identity = proof.get('identity', {})
+        return (proof.get('version') == VERSION and identity.get('subject') == program.scoped_identity[1]
+                and identity.get('degree') == program.degree
+                and identity.get('degree_award','') == program.degree_award
+                and identity_text(identity.get('home_unit', '')) == identity_text(program.home_unit))
     return any(f.verification_status == "verified" and any(
         eid in evidence and field in evidence[eid].supports_fields
         and evidence[eid].program_match == "exact"
         and intake_bound(program, evidence[eid])
         and usable(evidence[eid], criteria, as_of)
+        and scope_compatible(evidence[eid])
         for eid in f.evidence_ids) and matches_scalar(f) for f in observations)
 
 

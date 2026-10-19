@@ -285,7 +285,7 @@ def test_multi_school_web_budget_is_shared_and_searches_are_target_scoped(monkey
     monkeypatch.setattr(module, "TavilyMCP", Web)
     async def run():
         service = ResearchService(None, llm=NoModelCalls(), web_factory=Web)
-        async def accept(task, result, target, page):
+        async def accept(task, result, target, page, **kwargs):
             accepted.append(target.university)
         service._accept_page = accept
         task = parse_task(request("CMU、UIUC、UCSD、Georgia Tech、UBC 的 MSCS GRE 政策"))

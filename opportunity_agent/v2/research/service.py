@@ -26,7 +26,7 @@ from .quality import field_supported, program_matches, usable, intake_bound
 from .rewrite import query_rewrites
 from .task import parse_task, intake_supported, intake_matches
 from .web import OfficialWeb, TavilyMCP
-from .identity import school_aliases, canonical_school, canonical_program, normalize_intake
+from .identity import school_aliases, canonical_school, canonical_program, normalize_intake, is_excluded, excluded_scope, requested_program
 from .temporal import source_intake, expired_current_deadline
 from ..core.progress import ResearchProgress
 
@@ -100,6 +100,9 @@ class ResearchService:
         self.threshold = threshold
 
     async def execute(self, request):
+        if getattr(request, 'workspace_mode', False):
+            from ..workbench.research import execute_library
+            return await execute_library(self.session, request)
         self._request = request
         self.progress = ResearchProgress(getattr(request, "progress_channel", ""))
         result = ResearchResult(task_id=request.request_id)
@@ -370,24 +373,24 @@ class ResearchService:
             if any(f.verification_status == "conflicting" for f in p.facts):
                 missing.append({"kind": "source_conflict", "program_id": p.program_id,
                     "fields": list({f.field for f in p.facts if f.verification_status == "conflicting"})})
-        if task.target_count and len(valid) < task.target_count:
-            missing.append({"kind": "missing_programs", "count": task.target_count - len(valid)})
+        count = len({p.scoped_identity[:2] for p in valid})
+        if task.target_count and count < task.target_count:
+            missing.append({"kind": "missing_programs", "count": task.target_count - count})
         if not task.target_count and not result.programs and not result.findings:
             missing.append({"kind": "no_evidence", "fields": task.requested_fields})
         # A successful first school cannot stand in for the rest of a named scope.
         if task.entities.targets:
             for target in task.entities.targets:
                 if not any(p.university.casefold() in {a.casefold() for a in school_aliases(target.university)}
-                           and canonical_program(p.program) == canonical_program(target.program) for p in valid) and not any(
-                        canonical_school(u) == canonical_school(target.university)
-                        and canonical_program(p) == canonical_program(target.program) and intake_matches(task.entities.intake, i)
-                        for u, p, i in task.excluded_programs):
+                           and requested_program(p, target.program) for p in valid) and not excluded_scope(
+                        task.excluded_programs, target.university, target.program, task.entities.degree,
+                        task.entities.home_unit, task.entities.intake):
                     missing.append({"kind": "missing_target", **target.model_dump()})
         elif task.entities.universities:
             for school in task.entities.universities:
-                if not any(p.university.casefold() in {a.casefold() for a in school_aliases(school)} for p in valid) and not any(
-                        canonical_school(u) == canonical_school(school) and intake_matches(task.entities.intake, i)
-                        for u, _, i in task.excluded_programs):
+                if not any(p.university.casefold() in {a.casefold() for a in school_aliases(school)} for p in valid) and not excluded_scope(
+                        task.excluded_programs, school, degree=task.entities.degree,
+                        home_unit=task.entities.home_unit, intake=task.entities.intake):
                     missing.append({"kind": "missing_target", "university": school})
         if not result.programs:
             for question in task.semantic_questions:
@@ -446,7 +449,7 @@ class ResearchService:
                             temperature=0, max_tokens=1000, thinking=False)
                     targets = [ProgramResult(university=p.university, program=p.program, intake=task.entities.intake)
                         for p in parsed.programs if p.university and p.program]
-                    targets = [p for p in targets if p.identity not in task.excluded_programs]
+                    targets = [p for p in targets if not is_excluded(p, task.excluded_programs)]
                     if task.entities.program_family == "computer_science":
                         targets = [p for p in targets if "computer science" in p.program.casefold()
                                    or canonical_program(p.program) in {"mscs", "mcs", "cse"}]
@@ -556,8 +559,7 @@ class ResearchService:
 
     @staticmethod
     def _target_key(target):
-        return hashlib.sha256("|".join((canonical_school(target.university), canonical_program(target.program),
-                                       normalize_intake(target.intake).casefold())).encode()).hexdigest()[:32]
+        return hashlib.sha256('|'.join(target.scoped_identity).encode()).hexdigest()[:32]
 
     def _web_targets(self, task, result, candidates):
         """Probe missing named scopes without asserting that a programme exists."""
@@ -576,14 +578,12 @@ class ResearchService:
         else:
             targets = candidates or [ProgramResult(university=task.entities.university,
                 program=task.entities.program, intake=task.entities.intake)]
-        unique = {p.identity: p for p in targets if not any(
-            canonical_school(u) == canonical_school(p.university) and canonical_program(name) == canonical_program(p.program)
-            and intake_matches(p.intake, intake) for u, name, intake in task.excluded_programs)}
-        for target in unique.values():
+        for target in targets:
             if task.entities.degree:
                 target.degree = task.entities.degree
             if task.entities.home_unit:
                 target.home_unit = task.entities.home_unit
+        unique = {p.scoped_identity: p for p in targets if not is_excluded(p, task.excluded_programs)}
         # Work on missing targets first; don't spend bounded web calls repeating
         # already verified schools while another named target remains unsearched.
         pending = [p for p in unique.values() if task.freshness_required or not any(
@@ -672,7 +672,7 @@ class ResearchService:
 
     async def _accept_page(self, task, result, target, page, *, profile="standard", llm_blocked="",
                            allow_extraction_fallback=False, allow_blocked_fallback=False):
-        from .extraction import AdmissionExtraction, FIELDS, verify_fact, official_source, program_key
+        from .extraction import AdmissionExtraction, FIELDS, VERSION, verify_fact, official_source
         if not official_source(target.university, page["url"]):
             result.diagnostics.setdefault("web_field_rejections", []).append({"reason": "unofficial_source"})
             return
@@ -721,27 +721,53 @@ class ResearchService:
             provenance, reason = verify_fact(fact, target, page, fields, task.as_of)
             if reason:
                 rejection_reasons.append(reason)
-                result.diagnostics.setdefault("web_field_rejections", []).append({"field": fact.field, "reason": reason})
+                result.diagnostics.setdefault("web_field_rejections", []).append({"field": fact.field, "reason": reason,
+                    "url": page['url'], "value": fact.value, "program_quote": fact.program_quote,
+                    "target_identity": target.model_dump(include={'university','program','degree','home_unit','intake'}),
+                    "extracted_identity": fact.model_dump(include={'university','program','degree','home_unit','intake'}),
+                    "identity_references": [{**r.model_dump(), 'quote':r.quote[:200]}
+                        for r in fact.identity_claim.references] if fact.identity_claim else [],
+                    "applicability_quote": fact.applicability_quote[:300],
+                    "block_id": fact.block_id, "check": reason, "verifier_version": VERSION})
+                await self._progress('source', url=page['url'], title=page['title'],
+                    source_status='verification_failed', field=fact.field, value=fact.value, reason=reason)
             else:
                 verified.append((fact, provenance))
-        # Do not merge similarly named programmes administered by different Home Units.
-        units = {f.home_unit.casefold() for f, _ in verified if f.home_unit}
-        if len(units) > 1 and not target.home_unit:
-            result.missing_items.append({"kind": "identity_unverified", "reason": "ambiguous_home_unit"})
-            result.diagnostics.setdefault("web_field_rejections", []).append({"reason": "ambiguous_home_unit"})
-            verified = []
-        if len({program_key(f.program) for f, _ in verified}) > 1:
-            result.missing_items.append({"kind": "identity_unverified", "reason": "ambiguous_program_identity"})
-            verified = []
-        if len({p['intake'] for _, p in verified if p['intake']}) > 1:
-            result.missing_items.append({'kind': 'identity_unverified', 'reason': 'ambiguous_intake_scope'})
-            verified = []
+                await self._progress('source', url=page['url'], title=page['title'],
+                    source_status='verified' if provenance.get('year_status') != 'unknown' else 'year_unknown',
+                    field=fact.field, value=fact.value)
+        if verified:
+            from .identity import identity_text
+            groups = {}
+            for fact, proof in verified:
+                identity = proof['identity']
+                key = (identity['subject'], identity['degree'], identity.get('degree_award',''), identity_text(identity['home_unit']),
+                       normalize_intake(proof['intake'] or target.intake))
+                groups.setdefault(key, []).append((fact, proof))
+            for group in groups.values():
+                identity = group[0][1]['identity']
+                scoped = target.model_copy(update={'program': identity['program'],
+                    'program_subject': identity['subject'], 'degree': identity['degree'],
+                    'degree_award': identity.get('degree_award',''),
+                    'home_unit': identity['home_unit'], 'intake': group[0][1]['intake'] or target.intake,
+                    'facts': [], 'evidence': [], 'program_id': None, 'deadline': None, 'gre_policy': 'unknown'})
+                await self._accept_verified_group(task, result, scoped, page, parsed, group, match)
+            # Some fields may be valid while another identity binding needs repair.
+            unresolved = {'program_quote_missing','program_quote_not_located',
+                          'program_name_alignment_unresolved','scope_binding_ambiguous','degree_not_grounded'}
+            if getattr(self, '_repair_active', False) and set(rejection_reasons) & unresolved:
+                from .repair import ToolFailure
+                raise ToolFailure('IDENTITY_EVIDENCE_MISSING')
+            return
         if not verified:
             if fields and getattr(self, '_repair_active', False):
                 from .repair import ToolFailure
                 code = ('INTAKE_UNSUPPORTED' if rejection_reasons and all('intake' in r for r in rejection_reasons)
-                        else 'PROGRAM_MISMATCH' if rejection_reasons and all(any(k in r for k in
-                              ('program', 'degree', 'home_unit', 'school')) for r in rejection_reasons)
+                        else 'IDENTITY_EVIDENCE_MISSING' if set(rejection_reasons) & {
+                            'program_quote_missing','program_quote_not_located','program_name_alignment_unresolved',
+                            'scope_binding_ambiguous','degree_not_grounded','home_unit_not_grounded'}
+                        else 'PROGRAM_SCOPE_CONFLICT' if rejection_reasons and all(any(k in r for k in
+                              ('program', 'degree', 'home_unit', 'school','identity_claim')) for r in rejection_reasons)
                         else 'NO_SUPPORTED_FACTS')
                 raise ToolFailure(code)
             if page_intake_mismatch:
@@ -764,35 +790,20 @@ class ResearchService:
                 if program is not None and os.getenv("RESEARCH_PERSIST_FACTS", "1") == "1":
                     await self._persist_facts(result, program, page, [])
             return
-        observed_intake = next((p["intake"] for _, p in verified if p["intake"]), "")
-        if not target.program:
-            names = {f.program for f, _ in verified}
-            if len(names) != 1:
-                result.missing_items.append({"kind": "identity_unverified", "reason": "ambiguous_program"})
-                return
-            target = target.model_copy(update={"program": next(iter(names))})
-        program = next((p for p in result.programs if p.identity[:2] == target.identity[:2]
-            and (intake_matches(p.intake, observed_intake or target.intake)
-                 or intake_matches(target.intake, p.intake))
-            and p.home_unit.casefold() == target.home_unit.casefold()), None)
+
+    async def _accept_verified_group(self, task, result, target, page, parsed, verified, match):
+        """One verified subject/degree/unit/cycle per group; never invalidate siblings."""
+        observed_intake = next((p['intake'] for _, p in verified if p['intake']), '')
+        compatible = [p for p in result.programs if p.scoped_identity[:4] == target.scoped_identity[:4]
+                      and (intake_matches(p.intake, target.intake) or intake_matches(target.intake, p.intake))]
+        program = compatible[0] if len(compatible) == 1 else None
         if program is None:
             program = target.model_copy(deep=True)
             if task.freshness_required:
                 for old_fact in program.facts:
                     old_fact.verification_status = "stale"
-            program.program_id = program.program_id or hashlib.sha256("|".join(program.identity).encode()).hexdigest()[:32]
+            program.program_id = program.program_id or hashlib.sha256("|".join(program.scoped_identity).encode()).hexdigest()[:32]
             result.programs.append(program)
-        prior_identities = {program_key(e.extraction_provenance['fact']['program'])
-                            for e in program.evidence if e.extraction_provenance.get('fact')}
-        prior_units = {e.extraction_provenance['fact']['home_unit'].casefold()
-                       for e in program.evidence if e.extraction_provenance.get('fact', {}).get('home_unit')}
-        if (len(prior_identities | {program_key(f.program) for f, _ in verified}) > 1
-                or len(prior_units | units) > 1):
-            for existing in program.facts:
-                existing.verification_status = 'conflicting'
-            program.deadline, program.gre_policy = None, 'unknown'
-            result.missing_items.append({'kind': 'identity_unverified', 'reason': 'ambiguous_program_or_home_unit'})
-            return
         if observed_intake and re.fullmatch(r"20\d{2}", program.intake):
             program.intake = observed_intake
         self._require_fields(task, program)
@@ -835,9 +846,11 @@ class ResearchService:
                 program.gre_policy = "unknown" if conflict else fact.value
             accepted.append({**fact.model_dump(), "temporal_scope": ev.temporal_scope, "provenance": provenance})
         program.evidence = merge_evidence(program.evidence)
-        program, page_accepted = self._accept_official_passages(
-            task, result, target, page, parsed, match, observed_page_intake, program,
-            attach_evidence=False)
+        page_accepted = False
+        if match == 'exact':
+            _, page_accepted = self._accept_official_passages(
+                task, result, target, page, parsed, match, observed_intake, program,
+                attach_evidence=False)
         if task.semantic_questions and not any(
                 f.program_id == program.program_id and f.topic in task.semantic_questions for f in result.findings):
             await self._page_semantics(task, result, program, page, source_id, digest)
@@ -854,7 +867,8 @@ class ResearchService:
             try:
                 await queue.lpush("opportunity:v2:official-ingest", json.dumps({"url": page["url"], "title": page["title"],
                     "text": page["text"], "university": program.university, "program": program.program,
-                    "intake": program.intake, "facts": accepted}))
+                    "intake": program.intake, "degree":program.degree, "degree_award":program.degree_award,
+                    "home_unit":program.home_unit, "program_subject":program.program_subject, "facts": accepted}))
             except Exception as exc:
                 result.diagnostics.setdefault("ingest_queue_errors", []).append({"code": type(exc).__name__})
             finally:
@@ -864,7 +878,7 @@ class ResearchService:
                     result.diagnostics.setdefault('ingest_queue_errors', []).append({'code': type(exc).__name__})
 
     async def _extract_with_model(self, task, result, target, page, fields, profile):
-        from .extraction import AdmissionExtraction, SYSTEM, candidate_blocks, CACHE, verify_fact
+        from .extraction import AdmissionExtraction, SYSTEM, candidate_blocks, CACHE, verify_fact, quote_options, bind_source_references
         remaining = min(getattr(self, "_deadline", float("inf")),
                         getattr(self, "_page_deadline", float("inf"))) - asyncio.get_running_loop().time()
         timeout_budget = seconds("RESEARCH_COMPACT_EXTRACT_TIMEOUT_SECONDS", 20, 120) if profile == "compact" \
@@ -878,11 +892,13 @@ class ResearchService:
             context_limit = max(1200, min(10000, int(raw_limit)))
         except ValueError:
             context_limit = 5000
-        selected = candidate_blocks(page, target, fields, min(context_limit, 2500) if profile == "compact" else context_limit)
-        context = {"title": page['title'], "blocks": [{k: b[k] for k in ('id', 'headings', 'text')} for b in selected],
+        selected = candidate_blocks(page, target, fields, min(context_limit // 2, 1250) if profile == "compact" else context_limit // 2)
+        context = {"title": page['title'], "blocks": [{**{k:b[k] for k in ('id','headings','text')},
+                    'quote_ref': b['id'], 'clauses': quote_options(b)[1:]} for b in selected],
                    "university": target.university, "program": target.program,
                    "degree": target.degree, "home_unit": target.home_unit, "intake": target.intake, "fields": fields}
         diagnostics, started = [], time.monotonic()
+        original = None
         extraction_llm = copy.copy(self.llm)
         mode = _setting("RESEARCH_EXTRACT_OUTPUT_MODE") or "prompt"
         extraction_llm.structured_output_mode = mode if mode in {"json_schema", "json_object", "prompt"} else "prompt"
@@ -902,22 +918,85 @@ class ResearchService:
             from ...llm_context import conversation_scope
             with conversation_scope({}):
                 async with asyncio.timeout(budget):
-                    parsed = await asyncio.to_thread(extraction_llm.generate_structured, AdmissionExtraction,
-                        system=SYSTEM, context=context, temperature=0, max_tokens=3000, thinking=False,
-                        deadline=time.monotonic()+budget, diagnostics=diagnostics, allow_format_fallback=False)
+                    end = time.monotonic()+budget
+                    from pydantic import ValidationError
+                    for repair_round in range(2):
+                        try:
+                            parsed = await asyncio.to_thread(extraction_llm.generate_structured, AdmissionExtraction,
+                                system=SYSTEM, context=context, temperature=0, max_tokens=3000, thinking=False,
+                                deadline=end, diagnostics=diagnostics, allow_format_fallback=False)
+                        except ValidationError as exc:
+                            for error in exc.errors(include_url=False):
+                                value=error.get('input','')
+                                if isinstance(value,dict):value=value.get('value','')
+                                await self._progress('source',url=page['url'],title=page['title'],
+                                    source_status='schema_invalid',field='.'.join(map(str,error['loc'])),
+                                    value=str(value)[:180],reason=error['msg'][:180])
+                            if repair_round and original is not None:
+                                return original
+                            if repair_round or end-time.monotonic() < 2:
+                                raise
+                            await self._reserve_correction(page, target, 'schema')
+                            context = {**context, 'format_correction': str(exc)[:1200],
+                                       'instruction': 'Correct schema/enum errors using the same source blocks. Do not invent missing facts.'}
+                            result.diagnostics.setdefault('schema_repairs', []).append({'url':page['url'],'round':1})
+                            continue
+                        parsed = bind_source_references(parsed, selected)
+                        unresolved = []
+                        for fact in parsed.facts:
+                            _, reason = verify_fact(fact, target, page, fields, task.as_of)
+                            if reason in {'program_quote_missing','program_quote_not_located',
+                                          'program_name_alignment_unresolved','scope_binding_ambiguous',
+                                          'degree_not_grounded','home_unit_not_grounded'}:
+                                unresolved.append({'field': fact.field, 'block_id': fact.block_id,
+                                                   'program': fact.program, 'program_quote': fact.program_quote,
+                                                   'reason': reason})
+                        if not repair_round and unresolved and end-time.monotonic() >= 2:
+                            # Same correction slot as schema failures. Only grounded fragments, no new search.
+                            from .repair import ToolFailure
+                            try:
+                                await self._reserve_correction(page, target, 'identity')
+                            except ToolFailure:
+                                break
+                            original = parsed
+                            context = {**context, 'identity_correction': unresolved,
+                                'instruction': 'Correct identity references/applicability clauses from the supplied source. Keep valid facts, omit unsupported claims; never change the requested scope.'}
+                            result.diagnostics.setdefault('identity_repairs', []).append({'url':page['url'], 'round':1})
+                            continue
+                        break
             parsed = AdmissionExtraction.model_validate(parsed.model_dump())
             # Only cache grounded successes. Empty/error/rejected results must be repairable.
             if use_cache and parsed.facts and all(verify_fact(f, target, page, fields, task.as_of)[0] for f in parsed.facts):
                 CACHE.put(key, parsed)
             return parsed
+        except (TimeoutError, OSError) as exc:
+            if original is None:
+                raise
+            result.errors.append({'stage':'identity_repair', 'code':type(exc).__name__})
+            return original
         finally:
             result.diagnostics.setdefault("extraction_attempts", []).append({"program_id": target.program_id,
                 "seconds": round(time.monotonic()-started, 3), "source_chars": len(page["text"]),
-                "context_chars": sum(len(b["text"]) + sum(map(len,b["headings"])) + len(b["title"]) for b in selected),
+                "context_chars": sum(len(b["text"]) + sum(map(len,b["headings"])) + len(b["title"])
+                    + sum(len(o['text']) for o in quote_options(b)[1:]) for b in selected),
                 "blocks": len(selected), "cache_hit": cache_hit, "attempts": diagnostics})
             result.diagnostics['extraction_attempts'][-1].update(
                 role='extract', model=getattr(extraction_llm, 'model', 'custom-adapter'),
                 selected_block_ids=[b['id'] for b in selected])
+
+    async def _reserve_correction(self, page, target, kind):
+        from .repair import ToolFailure
+        key = hashlib.sha256((canonical_school(target.university) + page['url']).encode()).hexdigest()
+        used = getattr(self, '_page_corrections', set())
+        if key in used:
+            raise ToolFailure('PAGE_EXTRACTION_LIMIT')
+        reserve = getattr(self, '_reserve_extraction_correction', None)
+        if getattr(self, '_repair_active', False):
+            if reserve is None:
+                raise ToolFailure('LEDGER_UNAVAILABLE')
+            await reserve(kind)
+        used.add(key)
+        self._page_corrections = used
 
     async def _persist_facts(self, result, program, page, accepted):
         """Commit verified facts and the complete official page independently."""
@@ -935,22 +1014,31 @@ class ResearchService:
                 async with async_sessionmaker(self.session.bind, expire_on_commit=False)() as writer:
                     async with writer.begin():
                         stored = await persist_verified_page(writer, program, page, accepted)
-                        observed_intake = source_intake(program.intake, page["text"])
-                        document = await OfficialIngestionService(writer).ingest(stored["source"], page["text"], {
-                            "school": program.university, "program": program.program,
-                            "intake": program.intake, "source_intake": observed_intake,
-                            "temporal_scope": "explicit_intake" if observed_intake else "current_policy",
-                            "program_id": stored["program_id"], "program_match": "exact", "scope": "program",
-                            "expires_at": (date.today() + timedelta(days=30)).isoformat(),
-                        })
             program.program_id = stored["program_id"]
             result.diagnostics["persisted_facts"] = result.diagnostics.get("persisted_facts", 0) + stored["written"]
             result.diagnostics["refreshed_facts"] = result.diagnostics.get("refreshed_facts", 0) + stored["refreshed"]
             result.diagnostics.setdefault("persisted_programs", []).append(stored["program_id"])
+        except Exception as exc:
+            result.diagnostics.setdefault("persist_errors", []).append({"code": type(exc).__name__})
+            return
+        # Slow/cold embeddings must not roll back independently verified SQL facts.
+        try:
+            remaining = getattr(self, '_deadline', asyncio.get_running_loop().time()+5)-asyncio.get_running_loop().time()
+            async with asyncio.timeout(max(.01, min(5,remaining-.01))):
+                async with async_sessionmaker(self.session.bind, expire_on_commit=False)() as writer:
+                    async with writer.begin():
+                        observed_intake = source_intake(program.intake, page['text'])
+                        document = await OfficialIngestionService(writer).ingest(stored['source'], page['text'], {
+                            'school':program.university, 'program':program.program,
+                            'degree':program.degree, 'home_unit':program.home_unit, 'degree_award':program.degree_award,
+                            'intake':program.intake, 'source_intake':observed_intake,
+                            'temporal_scope':'explicit_intake' if observed_intake else 'current_policy',
+                            'program_id':stored['program_id'], 'program_match':'generic', 'scope':'program',
+                            'expires_at':(date.today()+timedelta(days=30)).isoformat()})
             result.diagnostics["persisted_documents"] = result.diagnostics.get("persisted_documents", 0) + 1
             result.diagnostics.setdefault("persisted_document_ids", []).append(document.id)
         except Exception as exc:
-            result.diagnostics.setdefault("persist_errors", []).append({"code": type(exc).__name__})
+            result.diagnostics.setdefault("ingest_errors", []).append({"code": type(exc).__name__})
 
     async def _page_semantics(self, task, result, program, page, source_id, digest):
         observed_intake = source_intake(program.intake, page["text"])

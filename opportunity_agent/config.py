@@ -57,6 +57,10 @@ def _setting(*names: str) -> str | None:
 
 
 def llm_api_key() -> str | None:
+    # Provider-scoped credentials prevent a stale DeepSeek/global key from being
+    # sent to ModelScope after switching only the URL/model.
+    if _setting('LLM_PROVIDER') == 'modelscope':
+        return _setting('MODELSCOPE_API_KEY')
     return _setting("LLM_API_KEY", "MODELSCOPE_API_KEY")
 
 

@@ -24,6 +24,8 @@ def run_failure_report(state):
         "repeated_call": "相同的失败调用或未改变档位/字段的重复提取被阻止；这是调用去重限制，不是官网连接失败。",
         "ledger_unavailable": "研究预算账本不可用，已安全停止外部调用。",
         "source_mismatch": "页面证据不满足项目、入学季或字段要求，未计作合格结果。",
+        "identity_evidence_missing": "字段已提取，但项目身份或适用范围缺少可定位证据，未计作已核实事实。",
+        "program_scope_conflict": "已读取证据与目标项目、学位或 Home Unit 明确冲突，已隔离该范围。",
         "repair_planner_failure": "修复决策模型不可用或超时，已使用安全兜底，未无限重试。",
         "scope_rejected": "搜索改写与任务范围冲突，已拒绝执行，未修改学校、项目或入学季。",
     }
@@ -33,6 +35,8 @@ def run_failure_report(state):
             continue
         stage, code, reason = error.get("stage"), error.get("code"), error.get("reason")
         category = ("timeout" if stage == "extract" and code in {"TimeoutError", "MODEL_TIMEOUT"} else
+            "identity_evidence_missing" if code == "IDENTITY_EVIDENCE_MISSING" else
+            "program_scope_conflict" if code == "PROGRAM_SCOPE_CONFLICT" else
             "scope_rejected" if code == "QUERY_SCOPE_REJECTED" else
             "tool_budget" if code in {"TOOL_BUDGET_EXHAUSTED", "REPAIR_BUDGET_EXHAUSTED", "SCHOOL_BUDGET_EXHAUSTED", "PAGE_EXTRACTION_LIMIT"} else
             "repeated_call" if code in {"REPEATED_FAILED_CALL", "UNCHANGED_EXTRACTION_RETRY"} else

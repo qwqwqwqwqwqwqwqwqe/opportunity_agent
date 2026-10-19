@@ -1,6 +1,12 @@
 """Read-only V2 Planning Agent backed by the V1 planning domain rules."""
 from __future__ import annotations
 
+
+def build_workspace_checklist(confirmed_project):
+    """Safe deterministic Planning path for explicit project requirements."""
+    from ..workbench.service import checklist
+    return checklist(confirmed_project)
+
 from datetime import date
 from urllib.parse import urlparse
 

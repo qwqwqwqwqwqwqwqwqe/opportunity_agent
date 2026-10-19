@@ -653,6 +653,12 @@ class OfficialWeb:
     async def _search_engine(self, query, domains):
         if self.client is None:
             return []
+        # A real index discovers URLs; query text never authorizes a guessed path.
+        if os.getenv('OFFICIAL_SEARCH_PROVIDER', 'auto') in {'auto', 'tavily'} and tavily_api_key():
+            from .official_search import search_official_index
+            self._index_results = await search_official_index(query, domains,
+                timeout=min(15., self.request_timeout_seconds), deadline=self.request_deadline)
+            return [(item['url'], item['title']) for item in self._index_results]
         site = " OR ".join("site:" + domain for domain in domains)
         search_query = f"{site} {query} admissions program deadline requirements"
         custom_endpoint = os.getenv("OFFICIAL_SEARCH_URL")
@@ -697,29 +703,31 @@ class OfficialWeb:
         domains = tuple(str(d).casefold().rstrip(".") for d in domains)
         if not domains:
             return {"results": [], "diagnostic": "no_registered_domain"}
-        sitemap_pages = await self._sitemap_urls(domains, query)
         search_pages = await self._search_engine(query, domains)
+        # Search hits keep their original order. Do not mix them with URL guesses
+        # or discard distinct hosts merely because they share a pathname.
+        if search_pages:
+            details = {item['url']: item for item in getattr(self, '_index_results', [])}
+            results = []
+            seen = set()
+            for url, title in search_pages:
+                if url in seen or not self._allowed(url, domains) or not self._robots_allowed(url):
+                    continue
+                seen.add(url)
+                results.append({'url': url, 'title': title,
+                    'content': details.get(url, {}).get('content', ''), 'discovery': 'search_index'})
+            if results:
+                return {'results': results[:8], 'diagnostic': {'search_candidates': len(results),
+                        'sitemap_candidates': 0, 'guessed_candidates': 0}}
+        sitemap_pages = await self._sitemap_urls(domains, query)
         urls = [item[0] for item in search_pages] + sitemap_pages
-        paths = list(self._DEFAULT_PATHS) + [
-            "/education/graduate-admissions",
-            "/education/graduate-studies/admissions",
-            "/graduate-admissions", "/graduate/admissions",
-        ]
-        if re.search(r"\bmsaii\b", query.casefold()):
-            paths.extend(["/apply-msaii-program", "/about-msaii-program", "/curriculum"])
-        if re.search(r"\b(?:mscs|mcs|cse)\b", query.casefold()):
-            paths.extend(["/education/master/index.html", "/education/masters/index.html",
-                          "/academics/masters/ms-in-computer-science"])
-        if re.search(r"\bmsaii\b", query.casefold()):
-            paths.extend(["/academics/masters-programs/msaii.html"])
-        for root in self._candidate_roots(domains, query):
-            urls.extend(urljoin(root + "/", path.lstrip("/")) for path in paths)
         ranked = self._rank(urls, query)
         ranked = [url for url in ranked if self._robots_allowed(url)]
         title_by_url = {url: title for url, title in search_pages}
         return {"results": [{"url": url, "title": title_by_url.get(url, ""), "content": "official URL candidate"}
                              for url in ranked[:max(5, min(12, self.page_limit * 2))]],
-                "diagnostic": {"sitemap_candidates": len(sitemap_pages), "search_candidates": len(search_pages)}}
+                "diagnostic": {"sitemap_candidates": len(sitemap_pages), "search_candidates": len(search_pages),
+                               "guessed_candidates": 0}}
 
     async def validate_url(self, url, domains):
         from .repair import ToolFailure

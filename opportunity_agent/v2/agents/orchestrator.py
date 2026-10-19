@@ -566,6 +566,14 @@ class DeterministicSynthesizer:
         if state.profile_result and state.profile_result.proposals:
             return "我已识别到可更新的画像或申请进展，并生成待确认变更；确认前不会修改长期状态。"
         if state.research_result:
+            if state.research_result.diagnostics.get('workspace'):
+                rows = state.research_result.diagnostics['recommendation']['results']
+                if not rows:
+                    return '我的项目库暂无匹配资料。请先在项目库导入并确认项目；不会自动联网搜索。'
+                return '查询范围：我的项目库（用户确认资料，非录取概率）\n\n' + '\n\n'.join(
+                    f"{r['university']} — {r['program']}（版本 {r['project_version']}）\n" +
+                    '\n'.join(f"- {k}：{v['value'] if v['status'] != '待核对' else '待确认'}" for k,v in r['requirements'].items())
+                    for r in rows)
             from ..research.quality import field_supported, usable
             research = state.research_result
             criteria = state.success_criteria or SuccessCriteria(evidence_required=True)
@@ -584,7 +592,8 @@ class DeterministicSynthesizer:
                             sources[eid].temporal_scope == "current_policy" for eid in fact.evidence_ids if eid in sources) else ""
                         rows.append(f"- {labels.get(fact.field, fact.field)}：{fact.value}{notice} {' '.join(links)}")
                 if rows:
-                    sections.append(f"**{program.university} — {program.program}（{program.intake}）**\n\n" + "\n".join(dict.fromkeys(rows)))
+                    scope_label=' / '.join(v for v in (program.degree,program.degree_award,program.home_unit) if v)
+                    sections.append(f"**{program.university} — {program.program}（{program.intake}{' / '+scope_label if scope_label else ''}）**\n\n" + "\n".join(dict.fromkeys(rows)))
             sources = {e.evidence_id: e for e in [*research.evidence, *(e for p in research.programs for e in p.evidence)]}
             rendered_findings = set()
             for finding in research.findings:
@@ -654,7 +663,17 @@ def _research_for_synthesis(result: ResearchResult | None) -> dict[str, Any] | N
             continue
         seen_findings.add(key)
         findings.append(finding)
-    payload["findings"] = findings
+    # Structured admissions fields must come from verified ResearchFact, not
+    # keyword-labelled prose passages (e.g. English score expiry mislabelled GRE).
+    fields_with_facts = {f['field'] for p in payload['programs'] for f in p['facts']
+                        if f['verification_status'] == 'verified'}
+    payload["findings"] = [f for f in findings if f['topic'] not in fields_with_facts]
+    used = {eid for p in payload['programs'] for f in p['facts'] for eid in f['evidence_ids']}
+    used.update(eid for f in payload['findings'] for eid in f['evidence_ids'])
+    if used:
+        payload['evidence'] = [e for e in payload['evidence'] if e['evidence_id'] in used]
+        for p in payload['programs']:
+            p['evidence_ids'] = [eid for eid in p['evidence_ids'] if eid in used]
     return payload
 
 
@@ -671,6 +690,9 @@ GRE policy, citation, or user preference. If research evidence is absent or a fi
 is unknown, say that it is unverified. For research facts, preserve source URLs from
 the supplied evidence as Markdown links when they are available; never fabricate a
 link. Do not cite a source that does not support the sentence immediately before it.
+Group admissions facts by programme, degree, credential and Home Unit. Never collapse
+MS/PhD policies or different Home Units into a single deadline/GRE rule. When the user
+did not select a scope, present separate labelled groups; an empty unit is unconfirmed.
 When official-page findings are present, quote at least one exact excerpt in the answer.
 Never answer with only a generic “not found”, “database has no record”, or “I could
 not verify” statement: use research diagnostics to state which official-domain
@@ -720,6 +742,7 @@ described as replacing the user's current roadmap."""
         if not self.client.enabled:
             raise SynthesizerUnavailable("LLM Synthesizer is not configured; set LLM_API_KEY before starting the API")
         context = {
+            'workspace_policy': 'When research task_type is library_qa/project_match, use ONLY user-confirmed project data. Never override with raw historical pages. Unknown is not satisfied. Explain matching experiences and do not invent admission probability. Source is user-confirmed, not independently official-verified.',
             "user_message": state.message,
             "route_decision": state.route_decision.model_dump(mode="json") if state.route_decision else None,
             "relevant_memory": state.memory,
@@ -917,6 +940,8 @@ class CustomOrchestrator:
                     preference_memory=state.preference_memory.model_dump(mode="json"))
             else:
                 state.success_criteria = await self.goal_parser.parse(goal_message)
+        if state.workspace_mode and 'research' in forced_agents:
+            state.success_criteria = SuccessCriteria(evidence_required=True)
         if state.success_criteria:
             state.success_criteria.memory_constraints = []  # Provenance comes from the service, not model claims.
             if is_policy_impact_question(state.message):
@@ -1134,6 +1159,15 @@ class CustomOrchestrator:
 
     @staticmethod
     def _check_completion(state: ExecutionState) -> CompletionResult:
+        if state.research_result and state.research_result.diagnostics.get('workspace') and not state.agent_failures:
+            if state.profile_result and state.profile_result.status in {'failed','partial'}:
+                return CompletionResult(status='PARTIAL',reasons=['画像更新未完成；保留本地检索结果。'])
+            if state.profile_result and state.profile_result.conflicts:
+                return CompletionResult(status='NEED_USER', reasons=['请确认画像信息冲突。'])
+            if state.plan_result and state.plan_result.status == 'failed':
+                return CompletionResult(status='PARTIAL', reasons=['计划未完成；已保留本地检索结果。'])
+            return CompletionResult(status='PASS' if state.research_result.findings else 'PARTIAL',
+                reasons=[] if state.research_result.findings else ['本人项目库暂无匹配资料，请导入并确认。'])
         criteria = state.success_criteria
         if criteria and criteria.needs_user_input:
             return CompletionResult(status="NEED_USER", reasons=criteria.needs_user_input)
@@ -1173,13 +1207,13 @@ class CustomOrchestrator:
             programs = research.programs if research else []
             valid = [item for item in programs if CustomOrchestrator._program_matches(item, research_criteria)]
             if research_criteria.required_program_count is not None:
-                remaining = research_criteria.required_program_count - len(valid)
+                remaining = research_criteria.required_program_count - len({item.scoped_identity[:2] for item in valid})
                 if remaining > 0:
                     missing_tasks.append(MissingTask(
                         agent="research",
                         reason="缺少符合数量、日期、GRE 和可靠相关证据要求的项目",
                         required_count=remaining,
-                        excluded_programs=[item.identity for item in valid],
+                        excluded_programs=[item.scoped_identity for item in valid],
                         missing_fields=list({f.field for p in programs for f in p.facts if f.verification_status != "verified"}),
                     ))
                     reasons.append(f"还需要 {remaining} 个合格项目。")
@@ -1187,7 +1221,7 @@ class CustomOrchestrator:
                 missing_tasks.append(MissingTask(
                     agent="research",
                     reason="尚未得到带可靠且高相关来源的研究结果",
-                    excluded_programs=[item.identity for item in valid],
+                    excluded_programs=[item.scoped_identity for item in valid],
                     missing_fields=list((research.diagnostics.get("task", {}) if research else {}).get("requested_fields", [])),
                 ))
                 reasons.append("尚未得到可追溯且与问题高度相关的研究证据。")

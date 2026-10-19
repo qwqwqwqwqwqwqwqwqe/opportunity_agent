@@ -5,12 +5,13 @@ import asyncio
 import json
 import os
 import re
+from urllib.parse import urlsplit
 from contextlib import asynccontextmanager, suppress
 
 from .config import settings
 
 
-STAGES = {"parse", "sql", "search", "read", "read_fallback", "extract", "school_done", "extraction_unavailable",
+STAGES = {"source", "parse", "sql", "search", "read", "read_fallback", "extract", "school_done", "extraction_unavailable",
           "repair_analyze", "repair_adjust", "repair_validate", "repair_budget_exhausted"}
 
 
@@ -24,9 +25,16 @@ def safe_progress(payload):
     if not isinstance(payload, dict) or payload.get("stage") not in STAGES:
         return None
     result = {"stage": payload["stage"]}
-    for key in ("school", "program", "error_code", "tool"):
+    for key in ("school", "program", "error_code", "tool", "title", "source_status", "field", "value", "reason"):
         if isinstance(payload.get(key), str):
             result[key] = payload[key][:180]
+    if isinstance(payload.get('url'), str):
+        try:
+            u=urlsplit(payload['url'])
+            if u.scheme == 'https' and u.hostname and not u.username and not u.password and u.port in {None,443}:
+                result['url']=payload['url'][:2048]
+        except ValueError:
+            pass
     for key in ("current", "total", "tools_used", "tool_limit"):
         if isinstance(payload.get(key), int) and not isinstance(payload[key], bool):
             result[key] = max(0, min(1000, payload[key]))

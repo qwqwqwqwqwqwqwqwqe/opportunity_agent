@@ -58,10 +58,10 @@ class ResultAggregator:
             ledger = {**ledger, "calls": list(calls.values())[-60:],
                 "tools_used": max(old_ledger.get("tools_used", 0), new_ledger.get("tools_used", 0)),
                 "decisions_used": max(old_ledger.get("decisions_used", 0), new_ledger.get("decisions_used", 0))}
-        by_identity = {item.identity: item for item in existing.programs}
+        by_identity = {item.scoped_identity: item for item in existing.programs}
         for item in incoming.programs:
-            prior = by_identity.get(item.identity)
-            by_identity[item.identity] = item if prior is None else self._merge_program(prior, item)
+            prior = by_identity.get(item.scoped_identity)
+            by_identity[item.scoped_identity] = item if prior is None else self._merge_program(prior, item)
         evidence = {item.evidence_id: item for item in merge_evidence([*existing.evidence, *incoming.evidence])}
         findings = {item.finding_id: item for item in [*existing.findings, *incoming.findings]}
         has_results = bool(by_identity or findings or evidence)
@@ -165,6 +165,7 @@ class ResultAggregator:
             country="" if existing.country and incoming.country and existing.country != incoming.country else primary.country or secondary.country,
             required_country=incoming.required_country or existing.required_country,
             university=primary.university, program=primary.program,
+            program_subject=primary.program_subject, degree=primary.degree, degree_award=primary.degree_award, home_unit=primary.home_unit,
             intake=primary.intake or secondary.intake,
             deadline=None if "deadline" in conflicting else deadline,
             gre_policy="unknown" if "gre_policy" in conflicting else gre,

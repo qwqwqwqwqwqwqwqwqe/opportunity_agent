@@ -20,8 +20,6 @@ from sqlalchemy import select
 
 from ...official_research import OfficialDomainRegistry, classify_program_page
 from ..db.models import OfficialSource, ResearchProgram, ResearchRequirement, KnowledgeDocument, KnowledgeChunk
-from .normalization import supported_value
-from .task import intake_supported
 
 
 def load_corpus(directory):
@@ -46,7 +44,8 @@ async def import_corpus(session, directory):
     for item in draft["programs"]:
         row = await session.scalar(select(ResearchProgram).where(
             ResearchProgram.university == item["university"], ResearchProgram.program == item["program"],
-            ResearchProgram.intake == item["intake"]))
+            ResearchProgram.intake == item["intake"], ResearchProgram.degree == '',
+            ResearchProgram.degree_award == '', ResearchProgram.home_unit == ''))
         if row is None:
             row = ResearchProgram(id=item["id"], university=item["university"], program=item["program"],
                                   intake=item["intake"], country=item.get("country", ""), aliases=item.get("aliases", []))
@@ -104,9 +103,9 @@ async def import_corpus(session, directory):
                                   content=item["content"], metadata_json=meta, embedding=embedding))
         report["chunks_added"] += 1
     await session.flush()
-    # Treat collected official material as formal after deterministic checks:
-    # registered HTTPS host, exact programme identity, explicit intake, and an
-    # exact quote/value pair. A model or manual review flag is not required.
+    # Legacy corpus snapshots lack v5 fact-level degree/unit provenance. Preserve
+    # their observations for review; page relevance is not independent verification.
+    # Verified scoped observations must enter through persist_verified_page.
     by_url = {s.url: s for s in sources.values()}
     text_by_source = {}
     for document in draft["documents"]:
@@ -119,11 +118,7 @@ async def import_corpus(session, directory):
             if fact["field"] not in {"deadline", "gre_policy", "tuition", "language"}:
                 continue
             raw_quote = fact["quote"]
-            quote_present = any(raw_quote in text for text in text_by_source.get(item["id"], []))
-            source_text = "\n".join(text_by_source.get(item["id"], []))
-            match, _, _ = classify_program_page(program.program, item.get("title", ""), source.url, source_text)
-            verified = (match == "exact" and intake_supported(program.intake, source_text)
-                        and quote_present and supported_value(fact["field"], fact["value"], raw_quote))
+            verified = False
             identifier = hashlib.sha256(("real150:" + program.id + ":" + source.id + ":" + fact["id"]).encode()).hexdigest()[:32]
             if await session.get(ResearchRequirement, identifier):
                 continue

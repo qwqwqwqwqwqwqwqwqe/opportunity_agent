@@ -1,0 +1,59 @@
+{
+  "recording": "Transcribed official-page excerpts inspected on 2026-10-12; not full archived HTML. Model responses below are constructed regression inputs, not historical rejected responses.",
+  "pages": [
+    {
+      "id": "cmu_how_apply",
+      "university": "Carnegie Mellon University",
+      "target": "MSAII",
+      "url": "https://msaii.cs.cmu.edu/how-apply",
+      "title": "How to Apply | Carnegie Mellon University - Master of Science in Artificial Intelligence and Innovation",
+      "text": "# How to Apply\nThe application system for entry in Fall 2027 is now open! The deadline to apply is December 9, 2026.\nGRE scores: GRE is required.\nStatement of Purpose. It should discuss your reasons for choosing the MSAII program and indicate your intended career path.",
+      "facts": [
+        {"field":"deadline","value":"2026-12-09","quote":"The deadline to apply is December 9, 2026.","program":"MSAII","program_quote":"Master of Science in Artificial Intelligence and Innovation","degree":"masters","intake":"Fall 2027","intake_quote":"entry in Fall 2027","scope":"all","date_text":"December 9, 2026","deadline_kind":"final"},
+        {"field":"gre_policy","value":"required","quote":"GRE scores: GRE is required.","program":"MSAII","program_quote":"Master of Science in Artificial Intelligence and Innovation","degree":"masters","intake":"Fall 2027","intake_quote":"entry in Fall 2027","scope":"all","gre_required":true,"gre_considered":true}
+      ],
+      "accept": true
+    },
+    {
+      "id": "cmu_apply_program",
+      "university": "Carnegie Mellon University",
+      "target": "MSAII",
+      "url": "https://msaii.cs.cmu.edu/apply-msaii-program",
+      "title": "Apply to the MSAII Program | Carnegie Mellon University - Master of Science in Artificial Intelligence and Innovation",
+      "text": "# Apply to the MSAII Program\n## How To Apply\nThe application system for entry in Fall 2027 is now open! The deadline to apply is December 9, 2026.\nGRE scores: GRE is required.",
+      "facts": [
+        {"field":"deadline","value":"2026-12-09","quote":"The deadline to apply is December 9, 2026.","program":"MSAII","program_quote":"Master of Science in Artificial Intelligence and Innovation","degree":"masters","intake":"Fall 2027","intake_quote":"entry in Fall 2027","scope":"all","date_text":"December 9, 2026","deadline_kind":"final"},
+        {"field":"gre_policy","value":"required","quote":"GRE scores: GRE is required.","program":"MSAII","program_quote":"Master of Science in Artificial Intelligence and Innovation","degree":"masters","intake":"Fall 2027","intake_quote":"entry in Fall 2027","scope":"all","gre_required":true,"gre_considered":true}
+      ],
+      "accept": true
+    },
+    {
+      "id": "gt_wrong_mscs",
+      "university": "Georgia Institute of Technology",
+      "target": "Computational Science and Engineering",
+      "url": "https://www.cc.gatech.edu/ms-computer-science-admission-requirements",
+      "title": "MS Computer Science Admission Requirements | College of Computing",
+      "text": "# MS Computer Science Admission Requirements\nThe application deadline is Feb. 1 for admission to the following fall semester.\nA GRE score is not required for admission to the MSCS program. If provided, GRE scores will be considered.",
+      "facts": [
+        {"field":"deadline","value":"Feb. 1","quote":"The application deadline is Feb. 1 for admission to the following fall semester.","program":"MS Computer Science","program_quote":"MS Computer Science","degree":"masters","scope":"all","date_text":"Feb. 1","date_year_status":"unknown","deadline_kind":"final"},
+        {"field":"gre_policy","value":"optional","quote":"A GRE score is not required for admission to the MSCS program. If provided, GRE scores will be considered.","program":"MS Computer Science","program_quote":"MSCS program","degree":"masters","scope":"all","gre_required":false,"gre_considered":true}
+      ],
+      "accept": false
+    },
+    {
+      "id": "gt_cse",
+      "university": "Georgia Institute of Technology",
+      "target": "Computational Science and Engineering",
+      "url": "https://www.cse.gatech.edu/admissions-financial-aid",
+      "title": "Admissions & Financial Aid | School of Computational Science and Engineering",
+      "text": "# Admissions & Financial Aid\n## Admissions Requirements\nThe Graduate Record Exam (GRE) general test scores are optional for applications to the Computational Science and Engineering and CS Ph.D. programs but required for applications to the Computational Science and Engineering M.S. program.\nFor M.S. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is February 1.\nFor Ph.D. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is December 15.",
+      "facts": [
+        {"field":"deadline","value":"February 1","quote":"For M.S. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is February 1.","program":"Computational Science and Engineering","program_quote":"M.S. in CSE","degree":"masters","home_unit":"School of CSE","applicability_quote":"For M.S. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is February 1.","scope":"all","date_text":"February 1","date_year_status":"unknown","deadline_kind":"final"},
+        {"field":"deadline","value":"December 15","quote":"For Ph.D. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is December 15.","program":"Computational Science and Engineering","program_quote":"Ph.D. in CSE","degree":"doctoral","home_unit":"School of CSE","applicability_quote":"For Ph.D. in CSE, the application deadline for the home unit of School of CSE (in College of Computing) is December 15.","scope":"all","date_text":"December 15","date_year_status":"unknown","deadline_kind":"final"},
+        {"field":"gre_policy","value":"required","quote":"The Graduate Record Exam (GRE) general test scores are optional for applications to the Computational Science and Engineering and CS Ph.D. programs but required for applications to the Computational Science and Engineering M.S. program.","program":"Computational Science and Engineering","program_quote":"Computational Science and Engineering M.S. program","degree":"masters","applicability_quote":"required for applications to the Computational Science and Engineering M.S. program","scope":"all","gre_required":true,"gre_considered":true},
+        {"field":"gre_policy","value":"optional","quote":"The Graduate Record Exam (GRE) general test scores are optional for applications to the Computational Science and Engineering and CS Ph.D. programs but required for applications to the Computational Science and Engineering M.S. program.","program":"Computational Science and Engineering","program_quote":"Computational Science and Engineering","degree":"doctoral","applicability_quote":"optional for applications to the Computational Science and Engineering and CS Ph.D. programs","scope":"all","gre_required":false,"gre_considered":true}
+      ],
+      "accept": true
+    }
+  ]
+}

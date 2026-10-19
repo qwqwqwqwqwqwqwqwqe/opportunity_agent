@@ -13,7 +13,7 @@ from ...official_research import OfficialDomainRegistry, DynamicDomainCache
 from ..agents.contracts import ProgramResult
 from ..core.research_budget import estimate_school_count, school_seconds
 from ..core.telemetry import span
-from .identity import canonical_school, canonical_program
+from .identity import canonical_school, canonical_program, is_excluded, requested_program
 from .quality import field_supported, program_matches
 from .task import intake_matches
 from .repair import (TOOLS, ERROR_MESSAGES, ResearchRepairPlanner, RepairDecision, ToolArguments,
@@ -89,7 +89,7 @@ class BoundedWebRunner:
                     self.field_searches = saved.get("field_searches", [])
                     for p in saved.get("programs", []):
                         restored = ProgramResult.model_validate(p)
-                        if not any(v.identity == restored.identity for v in self.result.programs):
+                        if not any(v.scoped_identity == restored.scoped_identity for v in self.result.programs):
                             self.result.programs.append(restored)
                     if saved.get("finished"):
                         continue
@@ -233,7 +233,7 @@ class BoundedWebRunner:
                 if self.task.entities.program_family == "computer_science":
                     found = [p for p in found if "computer science" in p.program.casefold()
                              or canonical_program(p.program) in {"mscs", "mcs", "cse"}]
-                found = [p for p in found if p.identity not in self.task.excluded_programs]
+                found = [p for p in found if not is_excluded(p, self.task.excluded_programs)]
             error = None
         except Exception as exc:
             error = classify_failure(exc, "extract_program_facts")
@@ -264,7 +264,9 @@ class BoundedWebRunner:
         family_matches = self.task.entities.program_family != "computer_science" or (
             "computer science" in program.program.casefold() or canonical_program(program.program) in {"mscs", "mcs", "cse"})
         return (canonical_school(program.university) == canonical_school(target.university)
-            and (not target.program or canonical_program(program.program) == canonical_program(target.program))
+            and requested_program(program, target.program)
+            and (not target.degree or target.degree == program.degree)
+            and (not target.home_unit or target.home_unit.casefold() == program.home_unit.casefold())
             and intake_matches(target.intake, program.intake) and family_matches)
 
     async def emit(self, stage, tool="", code=""):
@@ -330,8 +332,9 @@ class BoundedWebRunner:
                 if exc.code != "EXTRACTION_CIRCUIT_OPEN":
                     raise
                 llm_blocked = exc.code
+        extraction_key = hashlib.sha256((self.school + self.pages[args.page_ref]['url']).encode()).hexdigest() if tool == 'extract_program_facts' else ''
         call_id = await self.ledger.reserve(self.school, tool=tool, signature=signature, retry=tool != "extract_program_facts",
-            extraction_key=self.target_id + args.page_ref if tool == "extract_program_facts" else "")
+            extraction_key=extraction_key)
         if tool in {"read_official_page", "extract_official_page"}:
             self.visited.append(args.url)
         observation = ToolObservation(call_id=call_id, target_id=self.target_id, tool=tool,
@@ -348,6 +351,9 @@ class BoundedWebRunner:
                         data = await self.web.search(args.query, self.domains)
                         self._last_search_data = data
                         urls = self.ranked_candidates(data.get("results", []))
+                        for url in urls:
+                            meta=next((v for v in self.candidate_refs.values() if v['url']==url), {})
+                            await self.service._progress('source',url=url,title=meta.get('title',''),source_status='discovered')
                         if not urls:
                             raise ToolFailure("NO_RELEVANT_RESULTS")
                         # Domain restriction is also enforced again before any read.
@@ -363,16 +369,28 @@ class BoundedWebRunner:
                             raise ToolFailure("NO_READABLE_CONTENT")
                         ref = hashlib.sha256((self.target_id + page["url"]).encode()).hexdigest()[:32]
                         self.pages[ref] = {**page, "target_id": self.target_id}
+                        await self.service._progress('source',url=page['url'],title=page['title'],source_status='read_ok')
                         observation.data = {"page_ref": ref, "url": safe_url(page["url"])}
                     else:
+                        async def reserve_correction(kind):
+                            await self.ledger.reserve_correction(self.school, call_id, extraction_key, kind)
+                        self.service._reserve_extraction_correction = reserve_correction
                         task = self.task.model_copy(deep=True)
                         task.requested_fields = list(args.fields)
                         self.service._page_deadline = asyncio.get_running_loop().time() + remaining
                         before = len(self.result.diagnostics.get("extraction_attempts", []))
                         try:
+                            await self.service._progress('source',url=self.pages[args.page_ref]['url'],
+                                title=self.pages[args.page_ref]['title'],source_status='extracting')
                             await self.service._accept_page(task, self.result, self.target, self.pages[args.page_ref],
                                                             profile=args.profile, llm_blocked=llm_blocked)
+                        except Exception as exc:
+                            await self.service._progress('source',url=self.pages[args.page_ref]['url'],
+                                title=self.pages[args.page_ref]['title'],source_status='extraction_failed',
+                                reason=classify_failure(exc,tool).code)
+                            raise
                         finally:
+                            self.service._reserve_extraction_correction = None
                             attempts = self.result.diagnostics.get("extraction_attempts", [])
                             if len(attempts) > before and any(a.get("status") == "ok" for a in attempts[-1]["attempts"]):
                                 await self.ledger.circuit(self.channel, "ok")
@@ -387,6 +405,8 @@ class BoundedWebRunner:
                 tool_span.set_attribute("tool.status", "ok")
         except Exception as exc:
             failure = classify_failure(exc, tool)
+            if tool in {'read_official_page','extract_official_page'}:
+                await self.service._progress('source',url=args.url,source_status='read_failed',reason=failure.code)
             observation.error_code, observation.retryable = failure.code, failure.retryable
             observation.message = ERROR_MESSAGES.get(failure.code, "工具未能完成；请使用允许的修复动作或停止该目标。")
             observation.allowed_actions = self.allowed_actions(tool, failure.code)
@@ -414,7 +434,7 @@ class BoundedWebRunner:
     def allowed_actions(tool, code):
         if code == "SERVICE_AUTH_OR_QUOTA":
             return ["stop_research"]
-        if code in {"PROGRAM_MISMATCH", "INTAKE_UNSUPPORTED", "OFFICIAL_DOMAIN_REJECTED", "PRIVATE_ADDRESS_REJECTED",
+        if code in {"HTTP_404", "HTTP_410", "PROGRAM_MISMATCH", "PROGRAM_SCOPE_CONFLICT", "IDENTITY_EVIDENCE_MISSING", "INTAKE_UNSUPPORTED", "OFFICIAL_DOMAIN_REJECTED", "PRIVATE_ADDRESS_REJECTED",
                     "PORT_REJECTED", "URL_CREDENTIALS_REJECTED", "TLS_REJECTED", "PAGE_SIZE_LIMIT", "REDIRECT_LIMIT"}:
             return ["read_official_page", "search_official_pages", "skip_target"]
         if code == "HTTPS_REQUIRED":
@@ -598,7 +618,7 @@ class BoundedWebRunner:
             url = getattr(self, "last_read_url", "")
             if url:
                 return RepairDecision(action="call_tool", tool="extract_official_page", arguments=ToolArguments(url=url))
-        if observation.error_code in {"PROGRAM_MISMATCH", "INTAKE_UNSUPPORTED", "NO_SUPPORTED_FACTS", "MISSING_FIELDS",
+        if observation.error_code in {"HTTP_404", "HTTP_410", "PROGRAM_MISMATCH", "PROGRAM_SCOPE_CONFLICT", "IDENTITY_EVIDENCE_MISSING", "INTAKE_UNSUPPORTED", "NO_SUPPORTED_FACTS", "MISSING_FIELDS",
                 "EXTRACTION_CIRCUIT_OPEN",
                 "OFFICIAL_DOMAIN_REJECTED", "PRIVATE_ADDRESS_REJECTED", "TLS_REJECTED", "PORT_REJECTED"}:
             return self.next_candidate()

@@ -86,7 +86,7 @@ def test_cross_school_recorded_date_evidence(index, quote, value, raw):
 
 @pytest.mark.parametrize('change,reason', [
     ({'university':'Georgia Institute of Technology'}, 'school_mismatch'),
-    ({'program':'Master of Data Science'}, 'program_identity_not_grounded'),
+    ({'program':'Master of Data Science'}, 'program_conflict'),
     ({'degree':'doctoral'}, 'degree_mismatch'),
     ({'home_unit':'School of Medicine'}, 'home_unit_not_grounded'),
     ({'quote':'GRE is required.'}, 'quote_not_in_block'),
@@ -214,7 +214,51 @@ def test_gre_enum_normalization_changes_format_not_meaning():
     page,target,_ = objects()
     original = fact(page,target).model_dump()
     assert AdmissionFact(**{**original,'value':'Not Required'}).value == 'not_required'
-    assert AdmissionFact(**{**original,'value':'You may submit scores'}).value == 'You may submit scores'
+    with pytest.raises(ValidationError):
+        AdmissionFact(**{**original,'value':'You may submit scores'})
+
+
+def test_source_date_format_normalized_without_inventing_year():
+    page,target,_=objects()
+    f=fact(page,target,field='deadline',value='January 15, 2027',date_text='January 15, 2027',
+           quote='Application deadline: January 15, 2027.',deadline_kind='final')
+    assert f.value=='2027-01-15'
+
+
+def test_local_title_alias_is_not_a_cross_programme_override():
+    assert same_program('MSAII','Master of Science in Artificial Intelligence and Innovation',
+        'Apply to the MSAII Program | Carnegie Mellon University - Master of Science in Artificial Intelligence and Innovation')
+    assert not same_program('MDS','Master of Science in Computer Science','Apply MDS | Master of Science in Computer Science')
+
+
+def test_schema_has_field_specific_gre_enum():
+    schema=AdmissionExtraction.model_json_schema()
+    assert schema['$defs']['GREAdmissionFact']['properties']['value']['enum']==[
+        'required','optional','not_required','not_accepted']
+
+
+def test_schema_failure_gets_only_one_bounded_correction():
+    class CorrectOnce(RecordedModel):
+        def generate_structured(self,model,**kwargs):
+            self.requests.append(kwargs)
+            if len(self.requests)==1:
+                return model(facts=[{**self.facts[0].model_dump(),'value':'GRE is required.'}])
+            return model(facts=self.facts)
+    async def run():
+        page,target,task=objects();model=CorrectOnce([fact(page,target)])
+        result=ResearchResult()
+        await ResearchService(None,llm=model)._accept_page(task,result,target,page)
+        assert len(model.requests)==2
+        assert model.requests[1]['deadline']==model.requests[0]['deadline']
+        assert 'format_correction' in model.requests[1]['context']
+    asyncio.run(run())
+
+
+def test_source_progress_rejects_unsafe_links():
+    from opportunity_agent.v2.core.progress import safe_progress
+    assert 'url' not in safe_progress({'stage':'source','url':'javascript:alert(1)'})
+    result=safe_progress({'stage':'source','url':'https://brown.edu/apply','source_status':'verification_failed','field':'deadline','reason':'intake_mismatch'})
+    assert result['source_status']=='verification_failed' and result['url']=='https://brown.edu/apply'
 
 
 def test_persistence_independently_refuses_year_unknown_deadlines():
@@ -354,7 +398,8 @@ def test_cross_page_different_home_units_are_not_merged():
             source = {**page,'text':page['text']+'\nHome Unit: '+unit}
             response = fact(source,target,home_unit=unit)
             await ResearchService(None,llm=RecordedModel([response]))._accept_page(task,result,target,source)
-        assert result.programs[0].gre_policy == 'unknown'
-        assert all(f.verification_status == 'conflicting' for f in result.programs[0].facts)
-        assert result.missing_items[-1]['reason'] == 'ambiguous_program_or_home_unit'
+        assert len(result.programs) == 2
+        assert {p.home_unit for p in result.programs} == {'School of Engineering', 'School of Science'}
+        assert all(p.gre_policy == 'not_required' for p in result.programs)
+        assert all(f.verification_status == 'verified' for p in result.programs for f in p.facts)
     asyncio.run(run())

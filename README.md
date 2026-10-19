@@ -1,12 +1,37 @@
 # Opportunity Agent · V2
 
-面向留学申请的多智能体助手：维护申请画像、核查学校官网信息、生成申请规划，并保留可追踪的执行、证据和审批记录。
+面向留学申请的多智能体助手：用户导入并确认候选项目，结合个人背景与全部经历进行本地匹配，管理申请清单、日程和提醒。旧自主官网查询作为实验路径保留。
 
 **Custom Python Orchestrator · openJiuwen A2A · PostgreSQL / pgvector · RAG · MCP · 偏好记忆 · 独立 Synthesizer**
 
 Router 只选择执行路径，领域 Agent 返回结构化结果，Synthesizer 负责最终回答。系统不以模型记忆替代官网证据：未核实的信息保持未知，未完成的查询如实返回缺口。
 
 > 当前为开发原型，不是已完成质量验收的选校服务。链路连通、证据校验和真实检索质量是三个不同层次。
+
+## 申请工作台（2026-10-15）
+
+新增项目库、日程表、申请 To-do 和本地聊天入口；从“全网自动查招生条件”转向“用户导入、审阅确认、匹配和跟踪”。完整设计及API见 [申请小助手计划](docs/application-assistant-plan.md)。以下历史章节描述原V2能力，不代表新项目库默认继续联网搜索。
+
+- 在“个人背景与经历”填写课程、目标和科研／项目／实习等全部经历。
+- 在项目库手填或导入网址；每批10个项目，每项目最多5页。Tavily只读正文，模型只生成草稿，读取或整理失败仍可手填。用户确认不是官方独立核验。
+- 审阅整表并勾选关键字段，发布后才进入本人检索池。缺年份日期、未确认分数和材料要求保持未知，不自动生成确定闹钟。
+- 根据经历推荐后点击加入申请，生成并确认清单。打勾只代表准备完成；提交另行标记。
+- 日历支持日期型和带时区事件、一次性站内及账户邮箱提醒。SMTP未配置只支持站内，关闭网页不保证通知；服务需持续运行。
+- 索引和导入由Worker执行；未就绪时明确文本降级。SQL和向量访问均隔离到本人项目与已发布版本。
+
+新配置：`APPLICATION_WORKSPACE_ENABLED=1`、可选`PROJECT_IMPORT_MODEL`，以及`SMTP_HOST/PORT/FROM/USERNAME/PASSWORD/SSL`。不改变已有密钥或模型。SMTP默认587+STARTTLS，`SMTP_SSL=1`时端口需显式设为465。首版保持一个Worker实例（内部两个导入消费者）。
+
+升级含新表，需要先备份并迁移；下列命令使用原GPU/OTel组合，若实际使用CPU组合必须保留相应参数：
+
+```powershell
+# 先完成 PostgreSQL 备份，安排短暂停机；不要删除数据库卷。
+docker compose -f docker-compose.yml -f docker-compose.research.yml stop api worker research profile planning
+docker compose -f docker-compose.yml -f docker-compose.research.yml build api research worker profile planning
+docker compose -f docker-compose.yml -f docker-compose.research.yml run --rm --no-deps api python -m alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.research.yml up -d
+```
+
+新增离线测试：`python -m pytest tests/test_v2_application_workspace.py -q`；前端轻量检查：`node tests/workspace_frontend_check.cjs`。这不是实际SMTP、真实模型或完整浏览器验收。历史项目和对话不会自动导入新私有项目库。
 
 ## 核心能力
 

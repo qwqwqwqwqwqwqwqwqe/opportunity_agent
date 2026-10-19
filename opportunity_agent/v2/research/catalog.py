@@ -9,7 +9,7 @@ import re
 from ..agents.contracts import Evidence, ProgramResult, ResearchFact, merge_evidence
 from ..db.models import OfficialSource, ResearchProgram, ResearchRequirement
 from .quality import program_matches
-from .identity import school_aliases, program_aliases, normalize_intake, intake_aliases
+from .identity import school_aliases, program_aliases, normalize_intake, intake_aliases, program_subject, is_excluded
 from .temporal import CURRENT_POLICY_PREFIX
 
 
@@ -29,14 +29,18 @@ class ResearchCatalog:
         if task.entities.targets:
             statement = statement.where(or_(*(and_(
                 func.lower(ResearchProgram.university).in_([a.casefold() for a in school_aliases(t.university)]),
-                func.lower(ResearchProgram.program).in_([a.casefold() for a in program_aliases(t.program)])) for t in task.entities.targets)))
+                or_(func.lower(ResearchProgram.program).in_([a.casefold() for a in program_aliases(t.program)]),
+                    ResearchProgram.program_subject.in_([program_subject(a) for a in program_aliases(t.program)]))) for t in task.entities.targets)))
         for name in ("university", "program", "intake", "country"):
             value = getattr(task.entities, name)
             scope = getattr(task.entities, {"university": "universities", "program": "programs", "country": "countries"}.get(name, "intake"))
             if name != "intake" and scope:
                 values = [alias for v in scope for alias in (school_aliases(v) if name == "university"
                     else program_aliases(v) if name == "program" else (v,))]
-                statement = statement.where(func.lower(getattr(ResearchProgram, name)).in_([v.casefold() for v in values]))
+                predicate = func.lower(getattr(ResearchProgram, name)).in_([v.casefold() for v in values])
+                if name == 'program':
+                    predicate = or_(predicate, ResearchProgram.program_subject.in_([program_subject(v) for v in values]))
+                statement = statement.where(predicate)
             elif value:
                 if name == "intake":
                     value = normalize_intake(value)
@@ -45,7 +49,14 @@ class ResearchCatalog:
                         ResearchProgram.intake.like(value + " %"), ResearchProgram.intake.like("% " + value)))
                     continue
                 values = school_aliases(value) if name == "university" else program_aliases(value) if name == "program" else intake_aliases(value) if name == "intake" else (value,)
-                statement = statement.where(func.lower(getattr(ResearchProgram, name)).in_([v.casefold() for v in values]))
+                predicate = func.lower(getattr(ResearchProgram, name)).in_([v.casefold() for v in values])
+                if name == 'program':
+                    predicate = or_(predicate, ResearchProgram.program_subject.in_([program_subject(v) for v in values]))
+                statement = statement.where(predicate)
+        if task.entities.degree:
+            statement = statement.where(ResearchProgram.degree == task.entities.degree)
+        if task.entities.home_unit:
+            statement = statement.where(func.lower(ResearchProgram.home_unit) == task.entities.home_unit.casefold())
         # EXISTS narrows SQL candidates. All observations are still checked for conflicts below.
         if not include_unknown:
             for field in ("deadline", "gre_policy"):
@@ -67,7 +78,7 @@ class ResearchCatalog:
         results = []
         for row in rows:
             result = await self.result(row, task.as_of)
-            if result.identity in task.excluded_programs:
+            if is_excluded(result, task.excluded_programs):
                 continue
             if include_unknown or program_matches(result, task.structured_filters, task.as_of):
                 results.append(result)
@@ -75,7 +86,8 @@ class ResearchCatalog:
 
     async def result(self, row, as_of=None):
         today = as_of or date.today()
-        result = ProgramResult(program_id=row.id, university=row.university, program=row.program, intake=row.intake, country=row.country)
+        result = ProgramResult(program_id=row.id, university=row.university, program=row.program, intake=row.intake,
+            country=row.country, degree=row.degree, degree_award=row.degree_award, home_unit=row.home_unit, program_subject=row.program_subject)
         pairs = (await self.session.execute(select(ResearchRequirement, OfficialSource)
             .join(OfficialSource, ResearchRequirement.source_id == OfficialSource.id)
             .where(ResearchRequirement.program_id == row.id).order_by(ResearchRequirement.id))).all()
@@ -86,6 +98,18 @@ class ResearchCatalog:
             status = "stale" if expired else "verified" if verified else "unknown"
             current_policy = observation.qualifier.startswith(CURRENT_POLICY_PREFIX)
             proof = observation.extraction_provenance or {}
+            from .extraction import VERSION
+            if proof.get('version') and proof['version'] != VERSION:
+                verified, status = False, 'unknown'
+            if result.degree or result.home_unit:
+                from .identity import identity_text
+                identity = proof.get('identity', {})
+                compatible = (proof.get('version') == VERSION and identity.get('subject') == result.scoped_identity[1]
+                    and identity.get('degree') == result.degree
+                    and identity.get('degree_award','') == result.degree_award
+                    and identity_text(identity.get('home_unit', '')) == identity_text(result.home_unit))
+                if not compatible:
+                    verified, status = False, 'unknown'
             evidence = Evidence(source_id=source.id, url=source.url, title=source.title,
                 excerpt=observation.excerpt, content_hash=observation.content_hash, intake="" if current_policy else row.intake,
                 temporal_scope="current_policy" if current_policy else "explicit_intake" if proof else "legacy",

@@ -1,5 +1,7 @@
 # V2.2 重构计划：Custom Orchestrator + jiuwen 多 Agent + RAG + 记忆 + 独立 Synthesizer
 
+> 2026-10-15 产品边界更新：以 [申请小助手计划](../docs/application-assistant-plan.md) 为新的默认业务路径。用户按项目提供网址，正文提取与模型整理仅产生待确认草稿；用户发布后进入独立私有项目池。Research执行library_qa/project_match，Planning生成已选申请的待确认清单，表单打勾由后端确定性写入，日历与站内／邮件提醒由Worker执行。旧全网招生查询保留为实验模式，不再是工作台的默认查询或失败兜底。旧数据及本文件原历史设计保留，不自动迁移。
+
 ## Context
 
 `opportunity_agent/plan2.md` 规划了面试级 V2 系统，但选定 LangGraph 作为编排运行时。本计划以 `opportunity_agent_v2_2_plan.md` 和最新架构图为依据：Custom Python Orchestrator 负责确定性控制，openJiuwen 用于 Router 和领域 Agent；本阶段不加入在线评估 Agent 或 Answer Validator，离线评测与可观测性仍保留。
@@ -163,19 +165,25 @@ async for agent_result in client.stream({"query": request_json, "conversation_id
 
 保留首轮 SQL/RAG/Hybrid/MCP-Web 流程。失败、无结果或项目/入学季证据不匹配时，ResearchRepairPlanner 读取结构化 ToolObservation，提议一个工具和参数；统一执行器校验权限、来源和预算再调用。顶层 Router 不参与工具决策。
 
+**2026-10-12 本地实现补充**：已区分“身份证据不足”和“明确范围冲突”。前者先利用已读取页面补齐身份上下文，必要时做一次有界结构化修正；后者转向合法候选，不能重试接受原事实。具体方案见下文“2026-10-12：项目身份校验失败分析与分步修复”，测试及剩余问题见 [实施报告](../docs/research-identity-scope-fix.md)。代码尚未部署到现有 Docker 服务。
+
 - 工具为 `search_official_pages`、`validate_official_url`、`read_official_page`、`extract_official_page`、`extract_program_facts`；复用 Tavily MCP，不添加浏览器/PDF或新 MCP 服务。直接读取和备用 MCP 提取分别计数。
 - 每校最多 6 次工具、2 次修复决策，默认 90 秒（显式环境变量覆盖）；全 Run 为 `min(60,6×N)` 次工具及 `min(20,2×N)` 次决策。N 首次估算并冻结；Research/执行总时间上限仍为 600/1800 秒，预留合成时间。
 - Redis Run 级账本请求前原子扣减；成功、失败、格式降级、备用请求均不能绕过计数。账本故障则停止外部调用。Research A2A 转发 `research_tool_state`，ResultAggregator 按调用 ID 去重，不重加累计快照。
-- 修复模型最多等待 20 秒，无隐式重试；失效时采用安全备用读取、一次 compact 提取或继续已有合法候选，再进行有界字段拆分搜索；连续 3 次修复服务故障后暂停该服务等待。简化提取最多 4000 字符、两个缺失字段；同页最多一次额外提取，必须更改档位或字段。统一执行器对所有入口禁止原样重复提取；其他工具的瞬时故障最多一次原参数重试。
+- 修复模型最多等待 20 秒，无隐式重试；失效时采用安全备用读取、一次 compact 提取或继续已有合法候选，再进行有界字段拆分搜索；连续 3 次修复服务故障后暂停该服务等待。简化提取最多 4000 字符、两个缺失字段；同页最多一次额外提取，必须改变候选证据上下文、档位或字段。身份修正与已有 Schema 纠错、compact 重试共享这一次额外调用配额，均记入工具账本、耗时和预算，不能各自再增加一次。统一执行器对所有入口禁止原样重复提取；其他工具的瞬时故障最多一次原参数重试。
 - 查询改写须保持当前学校、项目、国家、年份/学期和 GRE 筛选目标；拒绝明确冲突并补齐省略的任务锚点。候选按项目相关性排序，HTTP 仅构造 HTTPS 候选重新校验；错误专业/年份优先转到已有候选，受控备用读取不等待 LLM。
 - Redis Run 账本私有进度压缩保存候选、完整 URL、原始页面、待执行动作及已验证结果，公开快照只传递计数与安全状态；跨轮次续查不重启相同搜索。提取和修复模型不隐式注入聊天历史/画像。没有新动作时 Orchestrator 提前 PARTIAL，前端及 Synthesizer 使用统一的精确失败分类。
-- 官网边界拒绝明确区分协议/域名/端口/私网/重定向；LLM 不得放宽来源、安全策略或改写目标年份。取消“官网页面必须出现目标入学季”的硬门槛：无入学季的当前官方政策可用于筛选，但证据标记 `temporal_scope=current_policy`、来源入学季留空，回答说明“适用入学季未确认”；检索日期不能证明适用年份。明确标注其他入学季的页面仍拒绝，截止日期须有可核对的完整年份、支持月份缩写，当前/未来申请查询不能把已过期截止日期当作新日期。该区别须在缓存回读和 Synthesizer 中保留，不增加数据库迁移。模型连续三次超时/连接失败触发熔断；全 Run 最多一次、等待至少 30 秒的半开探测。
+- 官网边界拒绝明确区分协议/域名/端口/私网/重定向；LLM 不得放宽来源、安全策略或改写目标年份。取消“官网页面必须出现目标入学季”的硬门槛：无入学季的当前官方政策可用于筛选，但证据标记 `temporal_scope=current_policy`、来源入学季留空，回答说明“适用入学季未确认”；检索日期不能证明适用年份。明确标注其他入学季的页面仍拒绝。无年份截止日期保留原文并标为 `date_year_status=unknown`，不能自动补今年或直接丢弃，也不计为已核实的目标申请季日期；通过目标申请季日期约束须有可核对的完整年份，当前/未来申请查询不能把已过期截止日期当作新日期。该区别须在缓存回读和 Synthesizer 中保留；时间范围调整本身不新增迁移，项目身份隔离另需下文计划的 `0009`。模型连续三次超时/连接失败触发熔断；全 Run 最多一次、等待至少 30 秒的半开探测。
 - 工具级修复不等于 Checker PASS。Orchestrator 仍保留所有已验证结果，只补缺口；工具预算耗尽后 PARTIAL，由 Synthesizer 如实说明。技术故障不得伪装成需要用户提供官网事实。
-- SSE 显示失败分析、策略调整、备用读取及工具步数；Trace 和历史诊断保存安全错误码与计数，不记录密钥、完整网页或模型思维过程。默认关闭，先部署 Research 再部署 API 后启用；无需数据库迁移。
+- SSE 显示失败分析、策略调整、备用读取及工具步数，并区分模型输出格式失败、身份证据不足、明确范围冲突和年份未确认；Trace 和历史诊断保存安全错误码与计数，不记录密钥、完整网页或模型思维过程。工具级修复开关默认关闭，先部署 Research 再部署 API 后启用；工具修复机制本身无需迁移，但包含项目目录身份隔离的版本须先完成 `0009` 迁移及兼容验证。本次不执行迁移或部署。
 
 验收覆盖搜索改写、403 备用读取、空响应/超时简化提取、非法提议、来源拒绝、熔断及跨轮次计数；已有 4 个合格项目时只补第 5 个，不合格证据不计数，预算耗尽诚实返回缺口。
 
+项目身份修复补充验收：身份证据不足时优先利用正确页面，不原样重复搜索；明确项目冲突时换候选；同页 Schema/身份修正合计最多一次额外调用；修正失败保留旧字段，预算耗尽返回 PARTIAL，而不是要求用户提供官网事实。
+
 `ExecutionState` 归 Orchestrator 持有，按 `run_id` 保存原始用户目标、`SuccessCriteria`（纯闲聊可为空）、`RouteDecision`、每轮 Agent 结果、已接受的证据、轮数/时间预算及缺失任务。Result Aggregation & Context Builder 对领域结果按项目身份去重、保留来源与版本，生成给 Checker / Synthesizer 使用的当前汇总视图。**Completion Checker 不持有或缓存旧结果**，每次只读取该视图和成功标准；`direct_reply` 不调用 Checker，也不伪造 `PASS`。
+
+本地已实现作用域身份键“学校、项目主体、学位及授予类型、Home Unit、申请季”，跨轮合并和缺失任务排除集合均使用该键。用户未指定学位或 Home Unit 时，按已确认范围分组展示；只有要求唯一日期或必须选择一个范围才能完成筛选时才转 NEED_USER。不同范围的字段不能混用，同一项目的多个范围不能冒充多个学校；未知范围不能覆盖已确认范围，无年份日期不能满足具体申请季日期约束。
 
 Checker 第一版只做可操作的完成判断：被选中的 Agent 是否返回有效结构化结果、学校/项目数量、明确的日期范围、GRE 等结构化约束，以及证据来源是否可追溯、适用该项目、足够新且与查询高度相关。来源可靠性依官方域名、项目级匹配、抓取时间和证据标识校验；相关性依检索/重排分数与所问字段是否匹配。阈值在离线样例上校准并作为配置记录；缺来源、来源被拒绝、低相关或未知值均**不计为合格项**。Checker 不评价答案文风，也不把宽泛的“AI 强”直接变成主观通过/失败判定。
 
@@ -283,7 +291,93 @@ Memory Service 负责所有偏好写入；审批门保持模型只产出提案�
 
 Research Agent 内部的 Query Router 与顶层 Router 分离：结构化学校/项目字段走 **SQL → PostgreSQL**，课程、研究方向等语义问题走 **RAG → pgvector + Reranker**，同时含结构化条件与语义条件走 **Hybrid → PostgreSQL + RAG**；本地资料缺失或用户要求最新信息时走 **MCP/Web → 受控外部来源**。每条路径均返回带项目身份、来源、抓取时间和相关性信息的 `ResearchResult`，不生成最终回答。Hybrid 结果同样按项目身份合并并保留各字段证据，不把低可信网页结果覆盖已验证的结构化字段。
 
-### 现状：骨架在，管道断了
+### 2026-10-12：项目身份校验失败分析与分步修复
+
+#### 目标、状态与边界
+
+解决“正确官方页面已找到、字段已提取，却被身份校验误拒绝”的问题。保留当前 Orchestrator、Research Agent、搜索工具和模型分工，不开展 Crawl、Multi-Agent 重构或全架构重构，不关闭证据验证，也不为特定学校、URL 或日期格式硬编码。
+
+**状态：已完成本地代码修复、离线 Fixture、迁移脚本和定向回归验证；尚未执行现有数据库迁移或 Docker 部署。** Research 回归测试为 216 项通过、1 项跳过；真实模型抽样与剩余限制见 [实施报告](../docs/research-identity-scope-fix.md)。不新增评估 Agent 或在线 Answer Validator；正常页面仍使用现有快速提取模型一次批量提取，不统一升级昂贵模型；`data/conversations.json` 迁移继续暂缓，现有用户改动保留。
+
+以下行号保留为 2026-10-12 修复前诊断快照，不能用作新版行号；当前入口仍为同名文件中的 `same_program`、`verify_fact`、`_accept_page`、`_accept_verified_group` 和作用域身份键函数，新增入口见实施报告。历史 Run 证据、确定性重放和静态风险分开记录，不能把构造响应验证写成真实模型准确率。
+
+#### 失败原因与对应代码位置
+
+| 问题 | 代码位置 | 已确认的现象或风险 |
+|---|---|---|
+| 名称等价判断依赖字符串和特定标题格式 | [extraction.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/research/extraction.py:146)：`program_key`（146）、`same_program`（152）、`verify_fact` 的身份检查（283） | CMU 同一缩写与全称，因标题前半段有没有 `MSAII` 而得到不同结果；项目主体与带学位、`program` 后缀的名称不能可靠对齐。标题匹配缺陷已确定性复现。 |
+| 身份失败原因被折叠、诊断不足 | `extraction.py:283–286`；[service.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/research/service.py:724)：拒绝记录（724）、错误归类（748） | 缺少身份引用、引用无法定位、名称对齐失败都叫 `program_identity_not_grounded`；进一步被统称为 `PROGRAM_MISMATCH`。拒绝日志未保存 `fact.program`，无法完整还原历史比较。 |
+| 检索与字段校验使用不同身份规则 | [official_research.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/official_research.py:579)：`classify_program_page` | CMU 页面匹配为 exact，事实身份仍被拒绝；GT 正确 CSE 页面被标记为 generic。页面候选相关性不应替代字段身份验证。 |
+| 整块扫描造成作用域误判 | `extraction.py`：`blocks`（175）、学位检查（292）、项目检查（298–305）、Home Unit 检查（306） | 官网同一句明确比较 MS/PhD 政策，仍可能触发 `mixed_degree_scope`；身份信息位于相邻段落时可能无法绑定。最小重放已复现学位误拒绝。 |
+| 多身份结果被整批拒绝或可能混并 | `service.py:734–740、780–800`；[contracts.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/agents/contracts.py:148)：`ProgramResult.identity`；[result_aggregation.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/agents/result_aggregation.py:61)：`merge_research` 的合并键 | 当前会因多个项目名或 Home Unit 清空整批结果；汇总身份键没有学位与 Home Unit。身份键混并是静态检查发现的风险，不是历史 Run 已证明的污染。 |
+| 身份证据不足直接换页面 | [tool_loop.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/research/tool_loop.py:430)：`allowed_actions`（430）、`deterministic_repair` 的下一候选分支（614）；`service.py:919` 的 Schema 纠错 | `PROGRAM_MISMATCH` 导向下一候选页；现有 Schema 纠错没有覆盖身份绑定失败，容易重复搜索而未修复正确页面。 |
+| 持久化身份缺少隔离维度 | [models.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/db/models.py:199)：`ResearchProgram`；[fact_store.py](D:/Code/huawei/agent-core-rust-main/agent-core-rust-main/examples/opportunity_agent/opportunity_agent/v2/research/fact_store.py:59)：`persist_verified_page` 的目录查询与匹配 | 数据库唯一身份和查询匹配未包含学位、Home Unit；分组修复必须同时防止缓存回读和入库再次混并。这是待测试的静态风险。 |
+
+`program_identity_not_grounded` 当前是三个条件的组合：`program_quote` 为空、原文不在指定正文块/祖先标题/页面标题组成的 scope 中，或 `same_program(fact.program, fact.program_quote, scope)` 返回 False。它不是目标项目比较本身；之后的 `same_program(target.program, fact.program, scope)` 失败才返回小写 `program_mismatch`。当没有事实通过且拒绝原因都包含 program/degree/home_unit/school 时，服务层归类为大写 `PROGRAM_MISMATCH`，因此该错误不能单独证明模型找错项目或未提取成功。
+
+#### 案例依据与复现边界
+
+- CMU Run `6d16b7bb896c4aedbade7694b0f19da1`（Trace `d9a5252c19857535924fac6acf8843c3`）与隔离验收 Run `293986e3f8b341ef9f7deed3426cd172` 均记录结构化提取成功。第一张 [How to Apply](https://msaii.cs.cmu.edu/how-apply) 的 deadline/GRE 已有值，但身份校验拒绝；第二张 [Apply to the MSAII Program](https://msaii.cs.cmu.edu/apply-msaii-program) 通过。
+- CMU 拒绝日志中的全称非空且在标题内，说明名称等价判断未通过。当前函数对 `MSAII` 与该全称的重放：标题为 `How to Apply | 学校 - 全称` 时 False，标题为 `Apply to the MSAII Program | 学校 - 全称` 时 True。拒绝事实未保存完整 `fact.program`，这个重放不能伪称历史原始响应。
+- GT Run `d9d083acb61546d2a6d98d8e47e50686`（Trace `8e2feb6199b8c05178bafd6de04716d1`）实际查询 Computational Science and Engineering。第一张 [MSCS 页面](https://www.cc.gatech.edu/ms-computer-science-admission-requirements) 属于不同项目，必须继续拒绝归入 CSE；后续正确 [CSE 招生页面](https://www.cse.gatech.edu/admissions-financial-aid) 的 `CSE M.S.`、博士和硕士相关事实也在身份检查处被拒绝。
+- 用 CSE 官网比较句构造的最小事实重放中，无学位项目名与带 `M.S. program` 的名称产生 `program_mismatch`；名称完全对齐后仍产生 `mixed_degree_scope`。这是确定性构造用例，不是历史 Run 已记录的后续错误。该页面另有 Home Unit 限定和无年份日期，不能因修好身份就宣称日期已核实适用于 2027 Fall。
+- 上述字段先在身份检查处失败，不代表后续日期、年份、学位和字段值检查已经通过；修复必须保留这些检查。
+
+#### 第一步：补齐诊断与失败复现
+
+- 拆分身份失败原因：引用缺失、引用未定位、名称对齐未解决、明确项目冲突、作用域不明确、学位冲突、Home Unit 冲突。保留旧错误码的历史展示兼容，新决策不再仅依靠 `PROGRAM_MISMATCH`。
+- 拒绝诊断增加目标身份、提取身份、`program_quote`、正文块 ID、失败检查项和验证器版本；公开界面仅展示安全、限长的信息，原文片段按不可信数据转义，不记录密钥或模型思维过程。
+- 保存 CMU 两个页面和 GT 两个页面的离线 Fixture，标明来源、采集时间、内容版本和标签；历史拒绝输出缺失的部分使用明确标注的构造响应，不伪称完整历史重放。
+- 先记录旧验证器在固定 Fixture 上的基线和失败原因；后续每步用相同标签与样本比较，不将修复后的结果覆盖旧基线。
+
+#### 第二步：统一学校范围内的身份对齐
+
+- 将“项目主体名称、学位、Home Unit”分开比较。学位表达和通用名称后缀仅做格式归一化；不能把 Computer Science 与 Computational Science and Engineering 合并，也不能移除改变项目身份的专业词。
+- 移除对特定标题分隔符、大小写和标题顺序的依赖；不以全局跨学校缩写表作为事实身份依据。
+- 新增结构化 `ProgramIdentityClaim`：官方名称、别名、学位、Home Unit，以及各项原文引用。由现有提取模型在同一次多字段提取中输出，不新增常规模型调用。事实引用对应的身份声明，旧 `program`/`program_quote` 字段保留兼容读取，不能通过兼容路径绕过新验证。
+- 别名关系必须由当前学校官方标题、正文或结构关联支持。缩写首字母相同、官网域名相同不能单独证明项目相同；同页存在不同展开或关联不明确时保持未知。
+- 页面匹配器只负责候选排序；经验证的身份关联负责字段接受、合并和持久化。generic 页面允许继续分析，但不能直接被当作已验证事实；接受某条事实不等于接受整页所有项目。
+
+#### 第三步：改为事实级证据作用域
+
+- 保留标题层级、段落、列表项、表格行及其位置；允许身份引用来自标题或关联段落，字段引用仍必须定位在实际正文中，不能把全页作为任意事实的共享作用域。
+- 每条事实增加身份引用和适用范围引用；程序生成定位结果，不信任模型自报位置。引用类型明确区分页面标题、栏目与正文，防止跨栏目借用身份。
+- 对 MS/PhD 比较句验证事实对应的范围片段，不再因为外围段落提及另一学位就全部拒绝。范围片段不能排除真正限定该字段的条件；无法明确绑定则保持未知。
+- 同页不同项目、不同学位、不同 Home Unit 分开验证；不能借用兄弟栏目身份，也不能把某 Home Unit 的日期推广到所有 Home Unit。
+- 保留学校、明确项目冲突、学位、Home Unit、年份、来源安全及字段值验证。无年份日期保留原文并标为“年份未确认”，不自动补今年，也不计为已核实的目标申请季日期；明确其他申请季和已过期日期继续拒绝。
+
+#### 第四步：分组汇总，并隔离缓存与入库
+
+- 按“学校、项目主体、学位、Home Unit、申请季”生成作用域身份键。验证后分组产生多个 `ProgramResult`，不再因页面包含多个合法身份而清空全部结果；真正冲突只影响对应范围的字段。
+- 用户未指定学位或 Home Unit 时，按已确认范围分组展示；要求唯一日期或必须选择一个范围才能完成筛选时才请求澄清。数量判断遵循 SuccessCriteria，不把同一项目的不同范围重复计为多个学校。
+- 同步更新跨轮合并、缺失任务排除集合、持久化查询和缓存回读。未知范围不能覆盖已确认范围，已有合格结果不能因补查失败被清空；旧三维身份不能被误当作新的精确作用域证明。
+- 已创建迁移 `0009_research_scope_identity`，为项目目录补充学位、授予类型、Home Unit 和项目主体，并扩展唯一约束。旧记录保持原样、默认范围未知，不自动推断、合并或删除数据；已通过临时 SQLite 迁移测试，尚未对现有 PostgreSQL 执行迁移。降级遇到旧唯一键冲突时拒绝执行，不静默删改数据。
+- 提取及验证版本升级以隔离旧缓存。旧事实未经新版作用域验证不得满足具体学位或 Home Unit 的成功标准；新增契约字段提供默认值，旧 A2A 消息仍可读取。迁移、服务版本和缓存兼容须一起验证后再上线。
+
+#### 第五步：按失败类型执行有界修复
+
+- 明确跨项目、跨学校、跨学位冲突：换合法候选，不重试接受原事实；不得放宽官网或目标约束。
+- 身份引用不足或名称绑定未解决：先利用已读取页面重建身份上下文，不重复抓取或原样重复搜索；仍无法解决时允许一次针对缺失绑定的结构化修正，仅输入相关证据片段，不发送整个无关网页。
+- 同页修正与已有 Schema 纠错、compact 重试共享一次额外调用配额，记录工具账本、耗时和预算；各分支不能独立获得一次额外调用，也不能通过跨轮或备用入口重置配额。
+- 保留已验证字段，仅补缺失项；没有新证据或预算耗尽时返回 PARTIAL，不清空旧结果。技术失败不伪装成要求用户提供官网事实；只有用户目标确实需澄清时转 NEED_USER。
+- 前端区分“模型输出格式失败”“身份证据不足”“明确范围冲突”“年份未确认”，不再全部展示为 LLM 提取失败；旧 Run 的错误码保持可读。
+
+#### 测试、指标与交付验收
+
+- **CMU 标题泛化**：两个官网页面、不同标题分隔符及标题顺序均能绑定同一有证据支持的项目，不依赖 `MSAII` 必须出现在标题前半段；无官方别名支持的缩写仍不能通过。
+- **GT 项目隔离**：MSCS 页面事实不能归入 CSE；正确 CSE 页面能提取并分别绑定硕士、博士及 Home Unit；不能把博士 GRE optional 合并到硕士 GRE required。
+- **作用域验证**：同句比较 MS/PhD、同页多项目、共享要求、相邻身份段落、表格行均有正反例；明确交叉归因、兄弟栏目借用和缺失适用范围仍被拒绝。
+- **时间范围**：无年份日期保留但不推断年份；明确错误申请季和过期日期继续拒绝，未知日期不满足目标申请季日期约束。
+- **汇总与持久化**：跨轮旧结果保留；不同学位或 Home Unit 不合并；迁移前后旧记录保留，重复写入幂等，缓存回读及旧契约兼容通过测试，旧缓存不能绕过新版验证。
+- **修复预算**：同页最多一次额外修正；Schema、身份修正和 compact 各组合及跨轮续查均不超额；修正失败保留已有结果，技术失败不伪装成要求用户提供官网事实。
+- **固定离线指标**：字段正确率为“接受事实中正确的事实 / 接受事实”，覆盖率为“成功接受的 gold 事实 / gold 事实”，身份误拒绝率为“仅因身份校验拒绝的有效候选 / 有效候选”，跨项目污染率为“接受事实中归入错误身份的事实 / 接受事实”。零分母报告 N/A 并附分子/分母；分别报告总数和跨学校、网页结构分组结果。
+- **真实模型指标**：另行报告请求成功率、结构化输出成功率、验证接受率、模型调用次数及提取耗时（P50/P95），注明模型、参数、样本量和缓存状态。构造响应/录制响应验证只证明程序行为，不当作模型准确率；本次文档修订不产生测试或延迟结果。
+
+交付验收要求：上述已确认误拒绝用例通过，跨项目污染负例全部拒绝；正确页面中的有效事实不再因标题格式或外围学位词被整批丢弃。正常路径仍一次批量提取，额外修正受既有总预算约束。后续实施报告需给出代码变更、测试结果、基线与新版指标、真实模型耗时及未解决问题，不能以离线通过替代上线验收。
+
+### 原始建设基线：骨架在，管道断了（历史记录）
+
+以下保留早期 RAG 建设基线，不代表 2026-10-12 当前代码或部署状态；本次身份修复以本节上方诊断及后续测试为准。
 
 ```
 已存在                            缺失
@@ -297,7 +391,7 @@ Research Agent 内部的 Query Router 与顶层 Router 分离：结构化学校/
                                    ❌ reranker 配置是死的
 ```
 
-`OfficialIngestionService` 全仓只被 `tests/test_v2_foundation.py:78` 调用过——生产环境表恒为空，`/api/v1/research/sources` 是空壳。`HybridRetriever` 把所有 chunk 加载进内存做 Python 余弦。
+原始基线中，`OfficialIngestionService` 全仓只被 `tests/test_v2_foundation.py:78` 调用过——生产环境表恒为空，`/api/v1/research/sources` 是空壳；`HybridRetriever` 把所有 chunk 加载进内存做 Python 余弦。这些历史描述不能作为当前实现状态或身份验证的依据。
 
 ### 建设内容
 
@@ -323,7 +417,7 @@ v2 只有 `authority == "official"` 过滤，丢掉了 v1 `classify_program_page
 
 现成反例：`data/official_cache.json` 里 CMU MSCS 挂着 `www.ece.cmu.edu/admissions/graduate-faq.html`，`requirements[0].value` 是页头导航噪声。
 
-把 `classify_program_page` / `program_identity` / `_application_page_priority`（`official_research.py:524-598, 662`）的结果写进 `knowledge_chunks.metadata`，检索时作硬过滤 + 排序权重。**只有 `program_match == "exact"` 能闭合项目级待核验项。**
+把 `classify_program_page` / `program_identity` / `_application_page_priority`（`official_research.py:524-598, 662`）的结果写进 `knowledge_chunks.metadata`，用于候选排序和明确冲突过滤。**项目级待核验项须由字段级 Evidence Verifier 证明身份与适用范围兼容，不能仅凭旧页面分类器的 `program_match == "exact"` 闭合。** generic 页面可继续分析，但未经验证的字段不能计数；验明单条事实不意味着整页所有栏目都是 exact。后续 SQL/RAG/Hybrid 缓存回读同样保留该边界。
 
 **6. Reranker**（`core/config.py:18-19` 配置无人读取）
 
@@ -373,22 +467,30 @@ FastAPI 替换 `ThreadingHTTPServer`；JWT + Argon2；PostgreSQL + Redis + Docke
 
 实现 Research 四路径、RAG 八项（见上）及偏好记忆五项（见上）；MCP Client 仅接到 Research Agent。Server 补认证——当前 `v2/mcp/server.py` 的 `list_application_tasks` / `propose_application_change` 接受明文 `user_id`，任何 MCP 客户端可冒充任意用户。
 
+**2026-10-12 Research 修复增量（本地已实现，待部署）**：已依次实施“诊断与 Fixture 基线 → 学校范围内身份对齐 → 事实级作用域 → 分组汇总/缓存/入库隔离及 `0009` → 有界修复与前端分类”。固定构造响应 Fixture 覆盖率由 2/8 提升到 8/8，其中两条日期仍为年份未知；不能解释为真实模型准确率 100%。GT 真实模型抽样仍有一条博士 GRE 因结构化语义字段矛盾被拒绝，后续需在共享修正预算内处理，不能关闭一致性校验。未执行现有数据库迁移或部署。
+
 **验收**：
 - CMU/UIUC 合成场景有正确引用；无来源时不编造
 - deadline 走 SQL、课程语义走 RAG、组合条件走 Hybrid、最新官网信息走 MCP/Web
 - 检索资料不能直接改 Profile
 - 会话 A 说"我不考虑 GRE 项目" → 新建会话 B → Orchestrator 召回该偏好并注入相关组件
 - 显式陈述立即生效；模型推断的偏好停在 `approval_requests` 待确认
+- CMU 正确官网页面不因标题格式拒绝身份；GT 的 MSCS 与 CSE、硕士与博士、各 Home Unit 始终隔离
+- 同页多个合法身份按范围分组，unknown 年份保留但不计为已核实的目标申请季日期；真实模型与确定性 Fixture 的验收分开报告
 
 ### 阶段 4 · Completion Checker 与缺失修复循环
 
 实现无状态 Checker、`MissingTask`、最多 3 轮的有界补查、项目身份去重、`PASS` / `RETRY` / `NEED_USER` / `FAIL` / 预算耗尽 `PARTIAL` 分支。缺口明确属于 Research 时 Orchestrator 直接定向补查；只有任务类型改变才重新请求顶层 Router。Checker 不存旧结果，不调用领域 Agent，不生成最终答案。
+
+身份去重和 MissingTask 排除集合同步使用学校、项目主体、学位、Home Unit、申请季的作用域键；保留各范围的证据和冲突。用户未指定范围时允许分组展示，但不能合并成单一政策，也不能用多个分组虚增学校数量。需要唯一范围才能满足任务时转 NEED_USER。
 
 **验收**：要求 5 个项目而首轮只有 4 个时，旧 4 个始终留在 `ExecutionState`，仅 Research 补查，合并去重后重新检查；不合格新结果不计数；预算耗尽输出标注缺口的部分回答；需要用户澄清时暂停补查。
 
 ### 阶段 5 · 离线评测 + 可观测性（无评估 Agent）
 
 Gold dataset（100-150 条）；指标 `Profile Fact F1` / `Conflict Safety Rate` / `Retrieval Recall@5` / `MRR` / `Citation Precision` / `Answer Faithfulness`；RAG baseline 对比（vector only → hybrid → +rerank → +query rewrite）；OTel trace。
+
+Research 身份修复另记录固定 Fixture 的字段正确率、覆盖率、身份误拒绝率和跨项目污染率，定义见上文；真实模型单独报告请求/结构化输出/验证成功率、调用次数和 P50/P95 提取耗时。不得把构造响应测试当作 LLM 准确率，或把待实施计划当作已测量结果。
 
 **已存在**：`v2/evaluation/metrics.py`（`fact_f1` / `retrieval_metrics`）、`runner.py`（仅 profile 套件）、`v2/core/telemetry.py`（`span()` 已脱敏 `message`/`content`/`token`/`resume`/`api_key`）。
 
@@ -475,6 +577,13 @@ docker compose exec api python -c "from opportunity_agent.v2.core.config import 
 12. 用户澄清：约束不明确时 NEED_USER，暂停补查；不能把未证实事实填入最终答案
 13. 纯闲聊："你好"、"谢谢"等走 `direct_reply`，三个领域 Agent 与 Checker 均不调用，Synthesizer 回复且不伪造引用或长期记忆
 14. 混合输入："你好，帮我查今年截止日期"不能走 `direct_reply`；"我不考虑 GRE 项目了"须进入偏好/状态处理，不能被当成闲聊
+15. CMU 身份泛化：`how-apply` 与 `apply-msaii-program` 均能绑定有依据的 MSAII 身份，改变标题分隔符和顺序不改变结果；无证据缩写仍拒绝
+16. GT 项目隔离：目标 Computational Science and Engineering 时 MSCS 页面不能闭合字段；正确 CSE 页面分别验证硕士/博士及 Home Unit，比较句不因外围学位词整批失败
+17. 无年份日期：保留原文和“年份未确认”标识，不推断今年，不计为已核实的 2027 Fall 日期；明确错误年份仍拒绝
+18. 多范围隔离：跨轮汇总、MissingTask 排除、缓存回读和数据库写入不混并学位/Home Unit；未知范围不覆盖已确认范围，分组不虚增学校数量
+19. 身份有界修复：身份证据不足优先重建当前页面上下文，明确冲突换候选；同页 Schema/身份/compact 修正共享一次额外调用，跨轮不重置，失败保留旧结果
+20. 迁移与兼容：后续 `0009` 升级保留旧记录，默认范围未知，不自动推断或删除；旧 A2A 消息可读取，旧缓存/事实未经新版验证不能满足精确范围；本次文档修订不执行这些操作
+21. 诊断与指标：前端明确区分格式失败、身份证据不足、范围冲突和年份未知，旧 Run 保持可读；离线基线/新版结果与真实模型调用、耗时分别报告
 
 ```powershell
 python -m pytest -q

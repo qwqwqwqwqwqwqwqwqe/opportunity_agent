@@ -39,6 +39,8 @@ PROTOCOL_VERSION = "2.2"
 
 
 class DomainA2ARequest(BaseModel):
+    workspace_mode: bool = False
+    workspace_query: dict[str,Any] = Field(default_factory=dict)
     """Minimal, serialisable input for one stateless V2 domain invocation."""
 
     model_config = ConfigDict(extra="forbid")
@@ -122,6 +124,8 @@ def request_from_state(
         allowance = min(allowance, state._execution_deadline - time.monotonic()
                         - (synthesis_reserve() if agent == "research" else 0))
     return DomainA2ARequest(
+        workspace_mode=state.workspace_mode if agent == 'research' else False,
+        workspace_query=state.workspace_query if agent == 'research' else {},
         progress_channel=uuid.uuid4().hex if agent == "research" and os.getenv("RESEARCH_PROGRESS_ENABLED", "0") == "1" else "",
         agent=agent,
         user_id=state.user_id,

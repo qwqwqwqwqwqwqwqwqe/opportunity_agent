@@ -64,6 +64,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Opportunity Agent V2", version="2.0.0", lifespan=lifespan)
+from ..workbench.api import router as workspace_router
+app.include_router(workspace_router)
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:8766", "http://localhost:8766"],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -351,6 +353,7 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
                 # Release the event counter row before the asynchronous event
                 # writer starts; otherwise PostgreSQL/SQLite can deadlock.
                 await session.commit()
+                initial['workspace_mode'] = __import__('os').getenv('APPLICATION_WORKSPACE_ENABLED', '1') == '1'
                 state = await orchestrator.ainvoke(initial, event_queue=event_queue)
             await event_queue.join()
             await session.refresh(run)
@@ -543,7 +546,19 @@ async def get_run(run_id: str, user: CurrentUser, session: DBSession) -> dict:
             "repair_round_started", "synthesis_started"])).order_by(AgentEvent.sequence.desc()).limit(1))
     latest_draft = await session.scalar(select(AgentEvent).where(AgentEvent.run_id == run_id,
         AgentEvent.event_type.in_(["answer_snapshot", "answer_reset"])).order_by(AgentEvent.sequence.desc()).limit(1))
-    return {"id": run.id, "status": run.status, "trace_id": run.trace_id, "answer": state.get("answer", ""),
+    source_events = list((await session.scalars(select(AgentEvent).where(AgentEvent.run_id == run_id,
+        AgentEvent.event_type == 'research_progress').order_by(AgentEvent.sequence))).all())
+    source_progress = [e.payload for e in source_events if e.payload.get('stage') == 'source' and e.payload.get('url')]
+    if not source_progress:
+        seen_sources=set()
+        rr=state.get('research_result') or {}
+        for evidence in [*rr.get('evidence',[]),*(e for p in rr.get('programs',[]) for e in p.get('evidence',[]))]:
+            url=evidence.get('url','')
+            if url and url not in seen_sources:
+                seen_sources.add(url)
+                source_progress.append({'stage':'source','url':url,'title':evidence.get('title',''),
+                                        'source_status':'cached_evidence'})
+    return {"source_progress": source_progress, "id": run.id, "status": run.status, "trace_id": run.trace_id, "answer": state.get("answer", ""),
             "routing_diagnostics": routing or {}, "route_decision": state.get("route_decision"),
             "approval_ids": state.get("approval_ids", []),
             "conflict_ids": state.get("conflict_ids", []),
@@ -678,6 +693,14 @@ async def get_approval(approval_id: str, user: CurrentUser, session: DBSession) 
 
 @app.post("/api/v1/applications", status_code=status.HTTP_202_ACCEPTED)
 async def propose_application(body: ApplicationCreate, user: CurrentUser, session: DBSession) -> dict:
+    if body.project_id:
+        from ..workbench.schemas import Command
+        from ..workbench.api import select_project
+        if not body.request_id:
+            raise HTTPException(422,'从项目库加入申请需要 request_id')
+        return await select_project(body.project_id,Command(request_id=body.request_id,expected_version=body.expected_version),user,session)
+    if not body.university or not body.program:
+        raise HTTPException(422,'必须指定学校和项目，或确认的项目库ID')
     approval = await ApplicationCommandService(session).propose(user.id, "application.create", body.model_dump(mode="json"),
                                                                   request_id=f"application:{body.university}:{body.program}:{body.intake}")
     await session.commit()

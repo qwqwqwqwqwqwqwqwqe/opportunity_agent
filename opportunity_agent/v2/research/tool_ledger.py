@@ -130,6 +130,23 @@ class RedisToolLedger:
                     s["signatures"][signature].update(failed=True, retryable=observation["retryable"])
         await self._change(mutate)
 
+    async def reserve_correction(self, school, call_id, extraction_key, kind):
+        """Charge one nested model correction atomically while the parent tool is active."""
+        def mutate(s):
+            entry = s['schools'].get(school, {})
+            if entry.get('active', {}).get('id') != call_id or s.get('blocked'):
+                raise ToolFailure('LEDGER_UNAVAILABLE')
+            counts = s.setdefault('extractions', {})
+            if counts.get(extraction_key, 0) >= 2:
+                raise ToolFailure('PAGE_EXTRACTION_LIMIT')
+            if entry.get('tools', 0) >= 6 or s['tools_used'] >= s['tool_limit']:
+                raise ToolFailure('TOOL_BUDGET_EXHAUSTED')
+            counts[extraction_key] = counts.get(extraction_key, 0) + 1
+            entry['tools'] += 1
+            s['tools_used'] += 1
+            s.setdefault('corrections', []).append({'call_id': call_id, 'page_key': extraction_key, 'kind': kind})
+        await self._change(mutate)
+
     async def circuit(self, channel, operation, *, minimum_remaining=0):
         def mutate(s):
             circuit = s["circuit"].setdefault(channel, {"failures": 0, "opened_at": 0, "probe_used": False})

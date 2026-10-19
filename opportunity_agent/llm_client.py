@@ -22,6 +22,15 @@ T = TypeVar("T", bound=BaseModel)
 Completion = Callable[[dict[str, Any]], Any]
 
 
+def _compatible_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    # Verified gateway capability: Luna rejects custom temperature. Normalize
+    # before any request (including tools/streaming), without an extra paid retry.
+    result = dict(payload)
+    if str(result.get('model', '')).casefold().split('/')[-1] == 'gpt-6-luna':
+        result.pop('temperature', None)
+    return result
+
+
 @dataclass
 class CompletionMessage:
     """The OpenAI assistant-message subset needed for local tool execution."""
@@ -68,7 +77,7 @@ class LLMClient:
     def complete_message(self, payload: dict[str, Any]) -> CompletionMessage:
         deadline, cancel_event = self._request_budget.get()
         _check_budget(deadline, cancel_event)
-        payload = inject_conversation(payload)
+        payload = _compatible_payload(inject_conversation(payload))
         started = time.perf_counter()
         self.last_error = None
         try:
@@ -179,6 +188,7 @@ class LLMClient:
         payload = inject_conversation({"model": self.model, "stream": True,
             "temperature": kwargs.get("temperature", .15), "max_tokens": kwargs.get("max_tokens", 1800),
             "messages": [{"role": "system", "content": kwargs["system"]}, {"role": "user", "content": kwargs["user"]}]})
+        payload = _compatible_payload(payload)
         if "qwen" in self.model.casefold():
             payload["enable_thinking"] = kwargs.get("thinking", False)
         if self.reasoning_effort:

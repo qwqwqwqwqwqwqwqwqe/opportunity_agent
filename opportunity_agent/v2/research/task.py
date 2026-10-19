@@ -50,7 +50,7 @@ class ResearchTaskSpec(BaseModel):
     freshness_required: bool = False
     target_count: int | None = None
     missing_fields: list[str] = Field(default_factory=list)
-    excluded_programs: list[tuple[str, str, str]] = Field(default_factory=list)
+    excluded_programs: list[tuple[str, str, str] | tuple[str, str, str, str, str]] = Field(default_factory=list)
     clarifications: list[str] = Field(default_factory=list)
     as_of: date = Field(default_factory=date.today)
     routing_diagnostics: dict = Field(default_factory=dict)
@@ -215,8 +215,9 @@ def parse_task(request, catalogue=(), llm=None) -> ResearchTaskSpec:
     if request.missing_task:
         task.target_count = request.missing_task.required_count or task.target_count
         task.missing_fields = list(request.missing_task.missing_fields)
-        task.excluded_programs = [(canonical_school(u), p.casefold(), i.casefold())
-            for u, p, i in request.missing_task.excluded_programs]
+        task.excluded_programs = [tuple(v) if len(v) == 5 else
+            (canonical_school(v[0]), v[1].casefold(), v[2].casefold())
+            for v in request.missing_task.excluded_programs]
         task.requested_fields = list(dict.fromkeys(task.requested_fields + task.missing_fields))
     if not task.requested_fields:
         task.requested_fields = ["research"]

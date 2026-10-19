@@ -85,8 +85,8 @@
     if (!response.ok) { const data=await response.json().catch(()=>({})); throw Error(data.detail||`请求失败 (${response.status})`); }
     return response.status===204 ? null : response.json();
   }
-  function showAuth() { ui.app.hidden=true; ui.auth.hidden=false; state.user=null; }
-  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; }
+  function showAuth() { ui.app.hidden=true; ui.auth.hidden=false; state.user=null; document.dispatchEvent(new CustomEvent('workspace-reset')); }
+  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; document.dispatchEvent(new CustomEvent('workspace-chat')); }
   async function loadInitial() {
     try { state.user=await request('/auth/me'); showApp(); await Promise.all([loadConversations(),loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]); }
     catch (error) { if (!state.user) showAuth(); else toast(error.message); }
@@ -101,7 +101,7 @@
   async function openConversation(id) {
     if(state.activeFollow)state.activeFollow.cancel();
     state.conversationId=id; renderConversations(); ui.messages.innerHTML=''; ui.steps.textContent=''; $('run-info').textContent='';
-    showRunDiagnostics(null,null);
+    showRunDiagnostics(null,null);showSources(null);
     const item=await request('/conversations/'+encodeURIComponent(id));
     if(state.conversationId!==id)return;
     $('conversation-title').textContent=item.title;
@@ -113,7 +113,7 @@
         ui.messages.lastElementChild.append(info);
         const inspect=document.createElement('button');inspect.type='button';inspect.textContent='执行诊断';
         inspect.onclick=async()=>{try{const run=await request('/runs/'+encodeURIComponent(row.run_id));
-          if(state.conversationId===id){showRunInfo(row.run_id,run.trace_id);showRunDiagnostics(row.run_id,run.failure_report);}}
+          if(state.conversationId===id){showRunInfo(row.run_id,run.trace_id);showRunDiagnostics(row.run_id,run.failure_report);showSources(run);}}
           catch(error){toast(error.message);}};
         info.append(inspect);
         showRunInfo(row.run_id,row.trace_id);
@@ -129,7 +129,7 @@
     } else if(!active){
       const last=[...item.messages].reverse().find(row=>row.role==='user'&&row.run_id);
       if(last){try{const run=await request('/runs/'+encodeURIComponent(last.run_id));
-        if(state.conversationId===id){showRunDiagnostics(last.run_id,run.failure_report);
+        if(state.conversationId===id){showRunDiagnostics(last.run_id,run.failure_report);showSources(run);
           $('run-status').textContent=runLabel(run);}}
         catch(error){ /* Historical answers remain readable when diagnostics are unavailable. */ }}
     }
@@ -151,7 +151,8 @@
       return `<li>${link} · ${escape(item.university||'')} · 可能不匹配（未计入合格结果）`+
         ` · ${escape(item.reason||'项目身份未确认')}</li>`;
     }).join('');
-    target.innerHTML=`<details open><summary>${escape(report.summary||(report.recovered_failures?'查询已完成，工具异常已处理':'执行诊断'))}</summary><ul>${issues}${reasons}</ul>`+
+    const expanded=target.querySelector('details')?.open||false;
+    target.innerHTML=`<details${expanded?' open':''}><summary>${escape(report.summary||(report.recovered_failures?'查询已完成，工具异常已处理':'执行诊断'))}</summary><ul>${issues}${reasons}</ul>`+
       (report.recovered_failures?`<p>过程中发生 ${Number(report.recovered_failures)||0} 次工具异常，最终查询条件已满足。</p>`:'')+
       (report.tool_usage?.tool_limit?`<p>工具调用：${Number(report.tool_usage.tools_used)||0}/${Number(report.tool_usage.tool_limit)||0}；修复决策：${Number(report.tool_usage.decisions_used)||0}/${Number(report.tool_usage.decision_limit)||0}</p>`:'')+
       (report.extraction_timeout_seconds?`<p>模型提取超时累计：${Number(report.extraction_timeout_seconds).toFixed(1)} 秒</p>`:'')+
@@ -163,6 +164,36 @@
   function showRunInfo(id,traceId) {
     $('run-info').innerHTML=`Run：<a href="/api/v1/runs/${encodeURIComponent(id)}" target="_blank" rel="noopener">${escape(id)}</a>`+
       (traceId?` · Trace：${escape(traceId)}`:'');
+  }
+  function showSources(run) {
+    let box=$('official-source-status');
+    if(!box){box=document.createElement('section');box.id='official-source-status';box.className='run-diagnostics source-diagnostics';$('run-info').after(box);}
+    const grouped=new Map();
+    for(const item of run?.source_progress||[]){
+      let url;try{url=new URL(item.url);if(url.protocol!=='https:'||url.username||url.password)continue;}catch{continue;}
+      if(!grouped.has(url.href))grouped.set(url.href,[]);grouped.get(url.href).push(item);
+    }
+    const labels={discovered:'已发现官网候选（字段尚未验证）',read_ok:'正文读取成功',extracting:'LLM 提取中',
+      read_failed:'官网读取失败',schema_invalid:'模型输出格式不合格',
+      cached_evidence:'已保存的证据链接（本轮未重新读取）',
+      extraction_failed:'LLM 提取失败',verification_failed:'证据验证拒绝',verified:'字段已验证',year_unknown:'年份未确认'};
+    const expanded=box.querySelector?.('details')?.open||false;
+    const expandedPages=new Set([...(box.querySelectorAll?.('.source-page[open]')||[])].map(node=>node.dataset.url));
+    const verified=[...grouped.values()].filter(items=>items.some(i=>i.source_status==='verified')).length;
+    const rejectionLabels={program_quote_missing:'身份证据缺失',program_quote_not_located:'身份引用未能定位',
+      program_name_alignment_unresolved:'项目名称关联未确认',scope_binding_ambiguous:'字段适用范围未确认',
+      program_mismatch:'目标项目明确不匹配',program_conflict:'项目身份明确冲突',degree_mismatch:'学位不匹配',
+      degree_scope_conflict:'字段学位范围冲突',home_unit_mismatch:'Home Unit 不匹配',home_unit_not_grounded:'Home Unit 证据未确认'};
+    const status=i=>i.source_status==='extraction_failed'&&i.reason==='IDENTITY_EVIDENCE_MISSING'?'提取完成，身份证据不足':
+      i.source_status==='extraction_failed'&&i.reason==='PROGRAM_SCOPE_CONFLICT'?'提取完成，项目或适用范围冲突':
+      i.source_status==='verification_failed'&&rejectionLabels[i.reason]?rejectionLabels[i.reason]:
+      i.source_status==='extraction_failed'&&['PROGRAM_MISMATCH','MISSING_FIELDS','NO_SUPPORTED_FACTS'].includes(i.reason)?'提取完成，但未通过事实校验':labels[i.source_status]||i.source_status||'候选';
+    box.hidden=!grouped.size;
+    box.innerHTML=grouped.size?'<details'+(expanded?' open':'')+'><summary>官网链接与处理阶段 <span class="source-count">'+grouped.size+' 个页面 · '+verified+' 个含已验证字段</span></summary><p class="source-hint">官网候选不等于已核实事实。展开页面查看处理过程。</p>'+
+      [...grouped].map(([url,items])=>'<details class="source-page" data-url="'+escape(url)+'"'+(expandedPages.has(url)?' open':'')+'><summary><a target="_blank" rel="noopener noreferrer" href="'+escape(url)+'">'+escape(items[0].title||url)+'</a></summary><div class="source-url">'+escape(url)+'</div><ul class="source-timeline">'+
+        items.map(i=>'<li data-status="'+escape(i.source_status||'')+'">'+escape(status(i))+
+          (i.field?' · '+escape(i.field)+': '+escape(i.value||''):'')+
+          (i.reason?' · '+escape(i.reason):'')+'</li>').join('')+'</ul></details>').join('')+'</details>':'';
   }
   function showRunFailure(id,error,message) {
     appendMessage('assistant',`本次请求执行失败：${error||'服务暂时不可用'}\n\nRun ID：${id}。未生成完整回答。`);
@@ -186,7 +217,7 @@
     if (!state.conversationId) await createConversation();
     state.running=true; $('chat-form').querySelector('button').disabled=true; $('run-status').textContent='正在处理';
     appendMessage('user',message); ui.steps.textContent='开始分析…';
-    showRunDiagnostics(null,null);
+    showRunDiagnostics(null,null);showSources(null);
     const conversationId=state.conversationId;
     try {
       const run=await request('/conversations/'+encodeURIComponent(conversationId)+'/runs',{
@@ -237,7 +268,7 @@
         ui.messages.scrollTop=ui.messages.scrollHeight;
       };
       if(initial?.draft_answer)renderDraft(initial.draft_answer);
-      showRunDiagnostics(id,initial?.failure_report);
+      showRunDiagnostics(id,initial?.failure_report);showSources(initial);
       if(initial?.progress)stage=restoredStage(initial.progress);
       renderProgress();
       const watchdog=setInterval(async()=>{
@@ -247,6 +278,7 @@
         lastPoll=Date.now();
         polling=true;
         try {const run=await request('/runs/'+encodeURIComponent(id));
+          if(state.conversationId===conversationId)showSources(run);
           if(state.conversationId===conversationId)showRunInfo(id,run.trace_id);
           if(state.conversationId===conversationId&&run.failure_report?.has_issues)showRunDiagnostics(id,run.failure_report);
           if(run.status==='completed'||run.status==='failed')await complete();
@@ -271,7 +303,9 @@
           terminalStatus=runLabel(run);
           if(state.conversationId===conversationId){
             showRunInfo(id,run.trace_id);ui.steps.textContent=terminalStatus;
-            showRunDiagnostics(id,run.failure_report);
+            showRunDiagnostics(id,run.failure_report);showSources(run);
+            if(typeof document.dispatchEvent==='function' && typeof CustomEvent==='function')
+              document.dispatchEvent(new CustomEvent('workspace-results',{detail:run}));
             if(run.status==='failed'){renderDraft('');showRunFailure(id,run.error,message);}
             else if(run.answer){
               if(draft)draft.innerHTML=`<div class="meta">助手</div>${markdown(run.answer)}`;
@@ -392,7 +426,7 @@
   $('auth-form').onsubmit=async event=>{event.preventDefault();try{const result=await request('/auth/'+state.authMode,{method:'POST',body:JSON.stringify({email:$('email').value,password:$('password').value})});state.user=result.user;showApp();await Promise.all([loadConversations(),loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]);}
     catch(error){$('auth-error').textContent=error.message;}};
   $('logout').onclick=async()=>{await request('/auth/logout',{method:'POST'}).catch(()=>{});showAuth();};
-  $('new-conversation').onclick=()=>createConversation().catch(error=>toast(error.message));
+  $('new-conversation').onclick=()=>{document.dispatchEvent(new CustomEvent('workspace-chat'));createConversation().catch(error=>toast(error.message));};
   // Consolidation proposals can arrive after run_completed; refresh while idle.
   setInterval(()=>{if(state.user&&!state.running&&document.visibilityState==='visible')loadApprovals().catch(()=>{});},10000);
   $('memory-view').onclick=async event=>{
@@ -402,7 +436,7 @@
     catch(error){toast(error.message);}
     finally{await loadMemory().catch(error=>toast(error.message));}
   };
-  ui.conversations.onclick=event=>{const button=event.target.closest('[data-conversation]');if(button)openConversation(button.dataset.conversation).catch(error=>toast(error.message));};
+  ui.conversations.onclick=event=>{const button=event.target.closest('[data-conversation]');if(button){document.dispatchEvent(new CustomEvent('workspace-chat'));openConversation(button.dataset.conversation).catch(error=>toast(error.message));}};
   $('chat-form').onsubmit=event=>{event.preventDefault();const input=$('chat-input'),message=input.value.trim();if(message){input.value='';sendMessage(message);}};
   $('chat-input').onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}};
   ui.profile.onclick=event=>{if(event.target.id==='edit-profile')editProfile();};

@@ -5,11 +5,11 @@ import hashlib
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlparse
 
-from sqlalchemy import select, func, text as sql_text
+from sqlalchemy import select, func, or_, text as sql_text
 
 from ...official_research import OfficialDomainRegistry, DynamicDomainCache, classify_program_page
 from ..db.models import OfficialSource, ResearchProgram, ResearchRequirement
-from .identity import school_aliases, program_aliases, canonical_school, canonical_program, normalize_intake
+from .identity import school_aliases, program_aliases, canonical_school, canonical_program, normalize_intake, program_subject, identity_text
 from .normalization import supported_value
 from .temporal import source_intake, expired_current_deadline, CURRENT_POLICY_PREFIX
 
@@ -27,6 +27,8 @@ async def persist_verified_page(session, program, page, facts):
     match, _, _ = classify_program_page(name, title, url, body)
     semantic = bool(facts) and all(f.get("provenance", {}).get("version") for f in facts)
     observed_intake = "" if semantic else source_intake(intake, body)
+    degree, unit, subject = program.degree, program.home_unit, program.program_subject or program_subject(name)
+    award = program.degree_award
     if not semantic and match != "exact":
         raise ValueError("Fact persistence requires an exact programme")
     for fact in facts:
@@ -47,23 +49,45 @@ async def persist_verified_page(session, program, page, facts):
         if fact["field"] == "deadline" and expired_current_deadline(fact["value"], intake, date.today()):
             raise ValueError("A past deadline cannot represent a current application cycle")
 
+    if semantic:
+        identities = {(f['provenance']['identity']['subject'], f['provenance']['identity']['degree'],
+                       f['provenance']['identity'].get('degree_award',''),
+                       identity_text(f['provenance']['identity']['home_unit'])) for f in facts}
+        if len(identities) != 1:
+            raise ValueError('Cannot persist mixed programme scopes')
+        verified_subject, verified_degree, verified_award, verified_unit = next(iter(identities))
+        if (subject != verified_subject or (degree and degree != verified_degree)
+                or identity_text(unit) != verified_unit):
+            raise ValueError('Programme scope differs from verified facts')
+        degree = verified_degree
+        if award and award != verified_award:
+            raise ValueError('Programme credential differs from verified facts')
+        award = verified_award
+
     # Programme locks cover aliases; URL locks also protect shared source rows.
     if session.bind.dialect.name == "postgresql":
         await session.execute(sql_text("SET LOCAL lock_timeout = '2s'"))
         await session.execute(sql_text("SET LOCAL statement_timeout = '4s'"))
-        identities = ["program:" + "|".join((canonical_school(university), canonical_program(name), intake)), "source:" + url]
+        identities = ["program:" + "|".join((canonical_school(university), subject, degree, award, identity_text(unit), intake)), "source:" + url]
         keys = sorted(int.from_bytes(hashlib.sha256(k.encode()).digest()[:8], "big", signed=True) for k in identities)
         for key in keys:
             await session.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
+    name_predicate = ResearchProgram.program_subject == subject
+    if not semantic:
+        name_predicate = or_(name_predicate, func.lower(ResearchProgram.program).in_([a.casefold() for a in program_aliases(name)]))
     rows = list((await session.scalars(select(ResearchProgram).where(
         func.lower(ResearchProgram.university).in_([a.casefold() for a in school_aliases(university)]),
-        func.lower(ResearchProgram.program).in_([a.casefold() for a in program_aliases(name)])
+        ResearchProgram.degree == degree,
+        ResearchProgram.degree_award == award,
+        func.lower(ResearchProgram.home_unit) == unit.casefold(),
+        name_predicate
     ).order_by(ResearchProgram.id))).all())
     row = next((r for r in rows if normalize_intake(r.intake).casefold() == intake.casefold()), None)
     if row is None:
-        row = ResearchProgram(university=school_aliases(university)[0], program=program_aliases(name)[0],
-                              intake=intake, country=program.country or "")
+        row = ResearchProgram(university=school_aliases(university)[0], program=name,
+                              intake=intake, country=program.country or "", degree=degree, degree_award=award,
+                              home_unit=unit, program_subject=subject)
         session.add(row)
         await session.flush()
     digest = hashlib.sha256(body.encode()).hexdigest()

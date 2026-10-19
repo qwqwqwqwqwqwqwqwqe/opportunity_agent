@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import (Application, ApplicationPlan, ApplicationTask, ApprovalRequest, ChangeProposal,
@@ -155,6 +155,16 @@ class ApplicationCommandService:
         if action not in states:
             raise ValueError("unsupported task action")
         task.status = states[action]
+        # Workspace tasks can also be changed through approved chat commands.
+        # Advance the same optimistic version and cancel pending alarms there too.
+        from ..workbench.models import TaskDetail, CalendarEvent, Reminder
+        detail=await self.session.scalar(select(TaskDetail).where(TaskDetail.task_id==task.id))
+        if detail:
+            detail.version+=1
+            if task.status in {'completed','cancelled'}:
+                event_ids=select(CalendarEvent.id).where(CalendarEvent.task_id==task.id,CalendarEvent.user_id==proposal.user_id)
+                await self.session.execute(update(Reminder).where(Reminder.event_id.in_(event_ids),
+                    Reminder.status.in_(['pending','sending'])).values(status='cancelled'))
         if body.get("due_at"):
             task.due_at = datetime.fromisoformat(body["due_at"])
         task.evidence = body.get("evidence") or task.evidence

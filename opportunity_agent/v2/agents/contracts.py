@@ -93,8 +93,16 @@ class Evidence(BaseModel):
     def stable_id(self) -> "Evidence":
         if not self.evidence_id:
             import hashlib
+            identity = self.extraction_provenance.get('identity', {})
+            binding = ''
+            if identity:
+                fact = self.extraction_provenance.get('fact', {})
+                binding = json.dumps([identity.get(k,'') for k in
+                    ('university','subject','degree','degree_award','home_unit')]
+                    + [self.extraction_provenance.get('intake',''),fact.get('field',''),
+                       fact.get('applicability_quote','')],ensure_ascii=False)
             self.evidence_id = hashlib.sha256(
-                f"{self.source_id}|{self.content_hash}|{self.chunk_id}|{self.excerpt}".encode()
+                f"{self.source_id}|{self.content_hash}|{self.chunk_id}|{self.excerpt}{'|'+binding if binding else ''}".encode()
             ).hexdigest()[:32]
         return self
 
@@ -136,7 +144,9 @@ class ProgramResult(BaseModel):
     required_country: str = ""
     university: str
     program: str
+    program_subject: str = ''
     degree: str = ""
+    degree_award: str = ''
     home_unit: str = ""
     intake: str = ""
     deadline: date | None = None
@@ -148,6 +158,11 @@ class ProgramResult(BaseModel):
     def identity(self) -> tuple[str, str, str]:
         from ..research.identity import canonical_school, canonical_program, normalize_intake
         return (canonical_school(self.university), canonical_program(self.program), normalize_intake(self.intake).casefold())
+
+    @property
+    def scoped_identity(self) -> tuple[str, str, str, str, str]:
+        from ..research.identity import scope_key
+        return scope_key(self)
 
 
 class ProfileResult(BaseModel):
@@ -220,7 +235,7 @@ class MissingTask(BaseModel):
     agent: AgentName
     reason: str
     required_count: int | None = Field(default=None, ge=1)
-    excluded_programs: list[tuple[str, str, str]] = Field(default_factory=list)
+    excluded_programs: list[tuple[str, str, str] | tuple[str, str, str, str, str]] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
 
 
@@ -250,6 +265,8 @@ class AgentFailure(BaseModel):
 
 
 class ExecutionState(BaseModel):
+    workspace_mode: bool = False
+    workspace_query: dict[str,Any] = Field(default_factory=dict)
     _event_queue: Any = PrivateAttr(default=None)
     _execution_deadline: float | None = PrivateAttr(default=None)
     _execution_scope: Any = PrivateAttr(default=None)

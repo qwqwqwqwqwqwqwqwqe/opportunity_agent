@@ -16,6 +16,8 @@ TOOLS = ("search_official_pages", "validate_official_url", "read_official_page",
 ERROR_MESSAGES = {
     "NO_RELEVANT_RESULTS": "搜索没有候选页面，请调整关键词，保持项目和入学季约束。",
     "PROGRAM_MISMATCH": "页面不能明确匹配目标项目，不能使用学校首页或其他项目代替。",
+    "PROGRAM_SCOPE_CONFLICT": "原文与目标学校、项目、学位或 Home Unit 明确冲突，不能混用其他范围的政策。",
+    "IDENTITY_EVIDENCE_MISSING": "字段已提取，但项目身份或适用范围证据不足；已尝试有界修正，不能将其当作已核实事实。",
     "INTAKE_UNSUPPORTED": "页面明确标注的入学季与目标不符，不能用其他申请季政策替代。",
     "MISSING_FIELDS": "已有部分合格证据，但仍有请求字段缺失；保留已有事实。",
     "NO_SUPPORTED_FACTS": "没有通过原文引用与字段值校验的事实。",
@@ -101,6 +103,10 @@ def classify_failure(exc, tool):
     status = detail.get("http_status")
     if status in {401, 402}:
         return ToolFailure("SERVICE_AUTH_OR_QUOTA")
+    if status == 403 and tool in {'extract_program_facts', 'repair_planner'}:
+        return ToolFailure('SERVICE_AUTH_OR_QUOTA')
+    if status in {404, 410}:
+        return ToolFailure('HTTP_' + str(status))
     if status in {403, 429, 502, 503, 504}:
         delay = 0
         try:
