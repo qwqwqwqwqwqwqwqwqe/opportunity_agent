@@ -106,7 +106,8 @@ class ConversationContextService:
             # a single unbounded prompt. Cursor advances only after success/fallback.
             for offset in range(0, len(older), 8):
                 batch = [{"role": m.role, "content": m.content[:1500]} for m in older[offset:offset + 8]]
-                if self.client.enabled:
+                from ..core.config import settings
+                if self.client.enabled and settings.app_mode != "applyops":
                     try:
                         with conversation_scope(context.model_dump() | {"summary": summary, "recent_messages": batch}):
                             output = await asyncio.to_thread(self.client.generate_structured, SummaryOutput,

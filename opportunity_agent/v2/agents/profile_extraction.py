@@ -180,9 +180,9 @@ def rule_candidates(original: str) -> ExtractedCandidates:
         if evidence_is_other_person(original, text):
             continue
         uncertain = bool(re.search(r"可能|也许|大概|不确定|maybe|probably", text, re.I))
-        kind = "uncertain" if uncertain else "correction" if re.search(r"现在|刚|改成|更正|其实|不是", text) else "explicit"
+        kind = "uncertain" if uncertain else "correction" if re.search(r"现在|刚|改成|改为|更新为|更正|其实|不是", text) else "explicit"
         for field, label in [("toefl_score", "托福|TOEFL"), ("ielts_score", "雅思|IELTS"), ("gre_score", "GRE")]:
-            match = re.search(rf"(?:{label})\s*(?:现在是|刚考到|刚考了|改成|更正为)\s*(\d+(?:\.\d+)?)", text, re.I)
+            match = re.search(rf"(?:{label})\s*(?:现在是|刚考到|刚考了|改成|改为|更新为|更正为)\s*(\d+(?:\.\d+)?)", text, re.I)
             if match:
                 value = float(match[1])
                 result.facts.append(FactCandidate(field=field, raw_value=int(value) if value.is_integer() else value,

@@ -1,5 +1,18 @@
 # Opportunity Agent · V2
 
+## ApplyOps V3.2：官网监控与个人影响站内信
+
+申请工作台的新入口、数据库升级、模型配置与验收方法见 [ApplyOps 运行文档](docs/APPLYOPS_V3.md)。官网监控、只读个人影响 Agent、站内信与测评见 [监控运行与验收](docs/OFFICIAL_MONITOR.md)。V3.2 停用自动排期，保留历史计划。
+
+聊天入口为 [画像助手](docs/PROFILE_ASSISTANT.md)：更新画像、查询已有数据、普通聊天与解释官网变化通知，不再调用 RAG 或修改项目/待办。
+
+```powershell
+python -m pip install -e ".[dev,v3]"
+powershell -ExecutionPolicy Bypass -File .\scripts\run_v3_local.ps1 -Reload
+```
+
+本地脚本打开 `http://127.0.0.1:8000/v3`。Docker 使用 `docker compose -f compose.applyops.yml up --build -d`，当前 Compose 映射地址为 `http://127.0.0.1:8001/v3`。下文保留 V2 运行方式。
+
 面向留学申请的多智能体助手：维护申请画像、核查学校官网信息、生成申请规划，并保留可追踪的执行、证据和审批记录。
 
 **Custom Python Orchestrator · openJiuwen A2A · PostgreSQL / pgvector · RAG · MCP · 偏好记忆 · 独立 Synthesizer**

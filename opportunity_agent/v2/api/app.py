@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from contextlib import suppress
 from contextlib import asynccontextmanager
@@ -17,7 +18,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from ..agents.orchestrator import orchestrator
 from ...conflict_resolver import ProfileConflictResolver
 from ...models import StudentProfile, TaskProgress as DomainTaskProgress
 from ...state import derive_state
@@ -27,7 +27,6 @@ from ..core.telemetry import configure_telemetry, span
 from ..db.models import (AgentRun, AgentEvent, Application, ApplicationPlan, ApplicationTask, ApprovalRequest,
                          ChangeProposal, Conversation, Message, ProfileFact, User)
 from ..db.session import SessionLocal, create_schema
-from ..mcp.tools import V2ToolService
 from ..repositories import Repository, VersionConflict
 from ..services.applications import ApplicationCommandService
 from ..services.auth import AuthService
@@ -40,6 +39,11 @@ from ..schemas import ConflictDecision
 from ..schemas import (ApplicationCreate, ApprovalDecision, ConversationCreate, LoginRequest, ProfilePatch,
                        RegisterRequest, RunCreate, RunCreated, RunSummary, TaskCommand, UserOut)
 from .dependencies import CurrentUser, DBSession
+
+if settings.app_mode == "applyops":
+    from ...v3.orchestrator import orchestrator
+else:
+    from ..agents.orchestrator import orchestrator
 
 
 @asynccontextmanager
@@ -64,6 +68,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Opportunity Agent V2", version="2.0.0", lifespan=lifespan)
+from ...v3.api import router as workflow_router
+app.include_router(workflow_router)
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:8766", "http://localhost:8766"],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -73,6 +79,11 @@ app.mount("/v2/assets", StaticFiles(directory=WEB_DIR), name="v2-assets")
 @app.get("/v2", include_in_schema=False)
 async def v2_page() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/v3", include_in_schema=False)
+async def v3_page() -> FileResponse:
+    return FileResponse(WEB_DIR / "applyops.html")
 
 
 def user_out(user: User) -> dict:
@@ -90,7 +101,7 @@ def set_auth_cookies(response: Response, access: str, refresh: str) -> None:
 
 @app.get("/healthz")
 async def healthz() -> dict:
-    return {"status": "ok", "service": "opportunity-agent-v2"}
+    return {"status": "ok", "service": "applyops-v3" if settings.app_mode == "applyops" else "opportunity-agent-v2"}
 
 
 @app.post("/api/v1/auth/register", status_code=status.HTTP_201_CREATED)
@@ -271,10 +282,14 @@ async def dispatch_runs() -> None:
         try:
             async with SessionLocal() as session:
                 now = datetime.now(timezone.utc)
-                await session.execute(update(AgentRun).where(
+                expired = list((await session.scalars(select(AgentRun.id).where(
                     AgentRun.status == "running",
                     or_(AgentRun.lease_expires_at < now, AgentRun.lease_expires_at.is_(None)),
-                ).values(status="queued", execution_token=None, lease_expires_at=None))
+                ))).all())
+                if expired:
+                    await session.execute(update(AgentRun).where(AgentRun.id.in_(expired), AgentRun.status == "running",
+                        or_(AgentRun.lease_expires_at < now, AgentRun.lease_expires_at.is_(None)))
+                        .values(status="queued", execution_token=None, lease_expires_at=None))
                 queued = (await session.scalars(select(AgentRun).where(
                     AgentRun.status == "queued").order_by(AgentRun.created_at).limit(4))).all()
                 jobs = []
@@ -378,10 +393,27 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
                 service = ApplicationCommandService(session)
                 state["approval_ids"] = []
                 for index, proposal in enumerate(state["proposals"]):
+                    if proposal["type"] == "workflow.commands":
+                        from ...v3.service import WorkflowService
+                        from ...v3.contracts import Command, CommandBatch
+                        source_result = await WorkflowService(session).execute(user_id, CommandBatch(
+                            request_id=f"{run.id}:source", commands=[Command(type="source.create", payload={
+                                "kind": "chat", "source_ref": run.id, "excerpt": message[:20000]})]), source="chat", run_id=run.id)
+                        source_id = source_result["changed_resources"][0]["id"]
+                        for command in proposal["payload"]["commands"]:
+                            command["evidence_refs"] = [source_id]
+                        for action in proposal.get("deferred_actions", []):
+                            proposal["payload"]["commands"].append({"type": f"{action}.request", "payload": {}})
                     approval = await service.propose(user_id, proposal["type"], proposal["payload"],
                                                      f"{request_id}:{index}", run.id, proposal.get("reason", ""))
                     state["approval_ids"].append(approval.id)
                     await repo.append_event(run.id, "approval_required", {"approval_id": approval.id, "proposal_type": proposal["type"]})
+            if state.get("plan_draft_requested"):
+                from ...v3.service import WorkflowService
+                from ...v3.contracts import Command, CommandBatch
+                draft_receipt = await WorkflowService(session).execute(user_id, CommandBatch(request_id=f"{run.id}:draft",
+                    commands=[Command(type="plan.draft")]), source="chat", run_id=run.id)
+                state["plan_id"] = draft_receipt["changed_resources"][0]["id"]
             session.add(Message(conversation_id=conversation_id, role="assistant", content=state["answer"], status="processed", metadata_json={"run_id": run.id}))
             await repo.finalize_run(run, state, "completed", token)
             if state.get("consolidation_input"):
@@ -430,7 +462,24 @@ async def _execution_initial(session: DBSession, repo: Repository, run: AgentRun
         application_tasks = (await session.scalars(select(ApplicationTask).where(
             ApplicationTask.application_id.in_([item.id for item in applications])))).all() if applications else []
         tasks = [*plan_tasks, *application_tasks]
-        return {"user_id": user_id, "conversation_id": conversation_id, "run_id": run.id, "request_id": request_id,
+        extra = {}
+        if settings.app_mode == "applyops":
+            from ...v3.service import WorkflowService
+            from ...v3.profile_assistant import load_notice_context, notice_reference
+            extra["workflow_snapshot"] = await WorkflowService(session).snapshot(user_id)
+            reference = notice_reference(message, context.recent_messages)
+            if reference:
+                followup = reference != message
+                if followup:
+                    previous = await session.scalar(select(AgentRun).where(AgentRun.user_id == user_id,
+                        AgentRun.conversation_id == conversation_id, AgentRun.id != run.id, AgentRun.status == "completed",
+                        AgentRun.created_at <= run.created_at).order_by(AgentRun.created_at.desc(), AgentRun.id.desc()).limit(1))
+                    previous_notice = (((previous.graph_state or {}).get("results", {}).get("profile_assistant", {}).get("notice")) if previous else None)
+                    if previous_notice:
+                        reference = "通知 " + previous_notice["id"]
+                extra["notice_context"] = await load_notice_context(session, user_id, reference)
+                extra["notice_followup"] = followup
+        return {**extra, "user_id": user_id, "conversation_id": conversation_id, "run_id": run.id, "request_id": request_id,
                    "message": message, "recent_messages": context.recent_messages,
                    "preference_memory": context.preference_memory.model_dump(mode="json"),
                    "preference_versions": preference_versions,
@@ -690,6 +739,8 @@ async def get_approval(approval_id: str, user: CurrentUser, session: DBSession) 
 
 @app.post("/api/v1/applications", status_code=status.HTTP_202_ACCEPTED)
 async def propose_application(body: ApplicationCreate, user: CurrentUser, session: DBSession) -> dict:
+    if settings.app_mode == "applyops":
+        raise HTTPException(409, "use /api/v3/applications in ApplyOps mode")
     approval = await ApplicationCommandService(session).propose(user.id, "application.create", body.model_dump(mode="json"),
                                                                   request_id=f"application:{body.university}:{body.program}:{body.intake}")
     await session.commit()
@@ -698,6 +749,8 @@ async def propose_application(body: ApplicationCreate, user: CurrentUser, sessio
 
 @app.post("/api/v1/tasks/{task_id}/commands", status_code=status.HTTP_202_ACCEPTED)
 async def propose_task_command(task_id: str, body: TaskCommand, user: CurrentUser, session: DBSession) -> dict:
+    if settings.app_mode == "applyops":
+        raise HTTPException(409, "use /api/v3/tasks/{task_id}/commands in ApplyOps mode")
     task = await session.get(ApplicationTask, task_id)
     if not task:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "task not found")
@@ -734,6 +787,9 @@ async def reject(approval_id: str, _: ApprovalDecision, user: CurrentUser, sessi
 
 
 def _approval_error(exc: ValueError | IntegrityError) -> HTTPException:
+    from ...v3.service import WorkflowError
+    if isinstance(exc, WorkflowError):
+        return HTTPException(exc.status, str(exc))
     detail = str(exc)
     if isinstance(exc, IntegrityError) or "conflict" in detail:
         return HTTPException(status.HTTP_409_CONFLICT, detail)
@@ -744,4 +800,5 @@ def _approval_error(exc: ValueError | IntegrityError) -> HTTPException:
 
 @app.get("/api/v1/research/sources")
 async def research_sources(query: str, user: CurrentUser, session: DBSession, school: str = "", program: str = "") -> dict:
+    from ..mcp.tools import V2ToolService
     return await V2ToolService(session).search_official_requirements(query, school, program)

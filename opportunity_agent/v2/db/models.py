@@ -136,6 +136,9 @@ class ApplicationPlan(UUIDPrimaryKey, Timestamped, Base):
     status: Mapped[str] = mapped_column(String(32), default="active")
     revision_reason: Mapped[str] = mapped_column(String(160), default="initial_profile")
     source_run_id: Mapped[str | None] = mapped_column(ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True)
+    schema_version: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
+    base_plan_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     __table_args__ = (UniqueConstraint("user_id", "version", name="uq_application_plan_user_version"),)
 
 
@@ -149,6 +152,8 @@ class Application(UUIDPrimaryKey, Timestamped, Base):
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     requirements: Mapped[Json] = mapped_column(JSON, default=dict)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    offering_id: Mapped[str | None] = mapped_column(ForeignKey("workflow_offerings.id"), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class ApplicationTask(UUIDPrimaryKey, Timestamped, Base):
@@ -334,3 +339,7 @@ class EvaluationMetric(UUIDPrimaryKey, Timestamped, Base):
     name: Mapped[str] = mapped_column(String(100))
     value: Mapped[float] = mapped_column()
     details: Mapped[Json] = mapped_column(JSON, default=dict)
+
+
+# Register workflow mappings on the same metadata for tests and Alembic.
+from ...v3 import models as workflow_models  # noqa: E402,F401

@@ -23,6 +23,10 @@ class ProfileConflictService:
         return row
 
     async def resolve(self, conflict_id: str, user_id: str, choice: str) -> ProfileConflict:
+        from ..core.config import settings
+        if settings.app_mode == "applyops":
+            from ...v3.service import WorkflowService
+            await WorkflowService(self.session).state(user_id, lock=True)
         if choice not in {"new", "old"}:
             raise ValueError("choice must be new or old")
         row = await self.session.scalar(select(ProfileConflict).where(

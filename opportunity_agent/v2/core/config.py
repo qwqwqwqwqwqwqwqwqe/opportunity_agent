@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Settings:
+    app_mode: str = os.getenv("APP_MODE", "v2").casefold()
     database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/v2.db")
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     jwt_secret: str = os.getenv("JWT_SECRET") or secrets.token_urlsafe(48)

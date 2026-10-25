@@ -76,7 +76,7 @@
   function toast(message) { const el=$('toast'); el.textContent=message; el.hidden=false; clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.hidden=true,4500); }
   async function request(path, options={}, retry=true) {
     const headers = {'Accept':'application/json',...(options.body ? {'Content-Type':'application/json'} : {}),...options.headers};
-    const response = await fetch('/api/v1'+path,{credentials:'same-origin',...options,headers});
+    const response = await fetch(path.startsWith('/api/')?path:'/api/v1'+path,{credentials:'same-origin',...options,headers});
     if (response.status===401 && retry && !path.startsWith('/auth/')) {
       const refreshed=await fetch('/api/v1/auth/refresh',{method:'POST',credentials:'same-origin'});
       if (refreshed.ok) return request(path,options,false);
@@ -86,7 +86,8 @@
     return response.status===204 ? null : response.json();
   }
   function showAuth() { ui.app.hidden=true; ui.auth.hidden=false; state.user=null; }
-  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; }
+  function showApp() { ui.auth.hidden=true; ui.app.hidden=false; $('account-email').textContent=state.user.email; window.dispatchEvent(new Event('applyops:ready')); }
+  window.ApplyOpsBridge={request,escape,toast,reloadApprovals:()=>loadApprovals(),sendMessage,isRunning:()=>state.running};
   async function loadInitial() {
     try { state.user=await request('/auth/me'); showApp(); await Promise.all([loadConversations(),loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]); }
     catch (error) { if (!state.user) showAuth(); else toast(error.message); }
@@ -108,8 +109,9 @@
     item.messages.forEach(row=>{
       appendMessage(row.role,row.content);
       if(row.role==='user'&&row.run_id){
-        const info=document.createElement('div');info.className='hint';
-        info.innerHTML=`Run：<a href="/api/v1/runs/${encodeURIComponent(row.run_id)}" target="_blank" rel="noopener">${escape(row.run_id)}</a> · ${escape(row.run_status||'')}`;
+        const applyops=document.body.dataset.mode==='applyops';
+        const info=document.createElement(applyops?'details':'div');info.className=applyops?'message-audit':'hint';
+        info.innerHTML=(applyops?'<summary>执行记录</summary>':'')+`Run：<a href="/api/v1/runs/${encodeURIComponent(row.run_id)}" target="_blank" rel="noopener">${escape(row.run_id)}</a> · ${escape(row.run_status||'')}`;
         ui.messages.lastElementChild.append(info);
         const inspect=document.createElement('button');inspect.type='button';inspect.textContent='执行诊断';
         inspect.onclick=async()=>{try{const run=await request('/runs/'+encodeURIComponent(row.run_id));
@@ -202,9 +204,10 @@
     ui.messages.lastElementChild.append(button);
   }
   function appendMessage(role,content) {
+    if(role==='user'&&document.body.dataset.mode==='applyops')content=content.replace(/请解释官网变化通知 [a-f0-9]{32}/gi,'请解释这封官网变化通知');
     const article=document.createElement('article'); article.className='message '+(role==='user'?'user':'assistant');
     const rendered=role==='assistant'?markdown(content):`<div class="plain-text">${escape(content)}</div>`;
-    article.innerHTML=`<div class="meta">${role==='user'?'你':'助手'}</div>${rendered}`;
+    article.innerHTML=`<div class="meta">${role==='user'?'你':document.body.dataset.mode==='applyops'?'画像助手':'助手'}</div>${rendered}`;
     ui.messages.append(article); ui.messages.scrollTop=ui.messages.scrollHeight;
     return article;
   }
@@ -213,7 +216,7 @@
     state.conversations.unshift(item); await openConversation(item.id);
   }
   async function sendMessage(message) {
-    if (state.running) return;
+    if (state.running) { toast('正在处理上一条消息，请稍后再试'); return; }
     if (!state.conversationId) await createConversation();
     state.running=true; $('chat-form').querySelector('button').disabled=true; $('run-status').textContent='正在处理';
     appendMessage('user',message); ui.steps.textContent='开始分析…';
@@ -264,7 +267,7 @@
         if(state.conversationId!==conversationId)return;
         if(!text){if(draft){draft.remove();draft=null;}return;}
         if(!draft)draft=appendMessage('assistant','');
-        draft.innerHTML=`<div class="meta">助手 · 正在生成（尚未完成引用校验）</div><div class="plain-text">${escape(text)}</div>`;
+        draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'画像助手 · 正在整理回答':'助手 · 正在生成（尚未完成引用校验）'}</div><div class="plain-text">${escape(text)}</div>`;
         ui.messages.scrollTop=ui.messages.scrollHeight;
       };
       if(initial?.draft_answer)renderDraft(initial.draft_answer);
@@ -306,8 +309,9 @@
             showRunDiagnostics(id,run.failure_report);showSources(run);
             if(run.status==='failed'){renderDraft('');showRunFailure(id,run.error,message);}
             else if(run.answer){
-              if(draft)draft.innerHTML=`<div class="meta">助手</div>${markdown(run.answer)}`;
+              if(draft)draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'画像助手':'助手'}</div>${markdown(run.answer)}`;
               else appendMessage('assistant',run.answer);
+                ui.messages.scrollTop=ui.messages.scrollHeight;
             }
           }
           await Promise.allSettled([loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]);
@@ -364,6 +368,7 @@
     catch(error){toast(error.message); if(error.message.includes('changed')) await loadProfile();}
   }
   async function loadPlan() {
+    if(document.body.dataset.mode==='applyops'){state.plans=[];state.plan=null;ui.plan.innerHTML='<p class="hint">自动排期已停用，历史计划保留。</p>';return;}
     state.plans=await request('/plans');
     state.plan=await request('/plans/current').catch(error=>error.message==='no current plan'?null:Promise.reject(error));
     renderPlan();
@@ -405,6 +410,16 @@
   }
   function renderApprovals(){ui.approvals.innerHTML=`<h2>待确认</h2>${state.approvals.length?state.approvals.map(item=>`<div class="card approval-card"><h3>${escape(item.proposal_type)}</h3><p class="hint">${escape(item.reason||'请审阅变更')}</p>${approvalPreview(item)}<div class="button-row"><button class="primary" data-approval="${escape(item.id)}" data-decision="accept">确认</button><button data-approval="${escape(item.id)}" data-decision="reject">拒绝</button></div></div>`).join(''):'<p class="empty">没有待确认变更。</p>'}`;}
   function approvalPreview(item){const p=item.payload||{};
+    if(item.proposal_type==='workflow.commands')return (p.commands||[]).map(command=>{
+      const [kind,action]=command.type.split('.'),body=command.payload||{};
+      if(kind==='profile')return (body.facts||[]).map(f=>`<div class="kv"><span>${escape(fieldLabels[f.field]||f.field)}</span><span>${escape(plain(state.profile?.payload?.[f.field]))} → ${escape(plain(f.normalized_value??f.raw_value))}</span></div>`).join('');
+      if(kind==='preference')return approvalPreview({proposal_type:'preference.change',payload:body});
+      if(action==='request')return `<p class="hint">确认保存后${kind==='planning'?'生成计划草稿':'重新检查材料'}。</p>`;
+      const names={program:'学校项目',offering:'申请周期',application:'申请',requirement:'材料要求',material:'材料',task:'任务',calendar_event:'固定日程'};
+      const labels={university:'学校',name:'名称',cycle:'周期',deadline_date:'截止日期',deadline_at:'截止时刻',timezone:'时区',date_precision:'日期精度',gre_policy:'GRE 要求',status:'状态',priority:'优先级',key:'要求名称',kind:'类型',obligation:'是否必需',required_count:'需要数量',slot_key:'材料或推荐人',title:'名称',due_date:'任务日期',start_date:'开始日期',duration_days:'预估工作日',locked:'锁定日期',criteria:'具体要求',degree:'学位',home_unit:'院系'};
+      const target=command.target_id?(window.ApplyOpsBridge.resolveEntity?.(kind,command.target_id)||command.target_id):'';
+      return `<div class="card"><strong>${action==='create'?'新增':'修改'}${escape(names[kind]||kind)} ${escape(target)}</strong>${Object.entries(body).filter(([key])=>!['evidence','source_id','evidence_ref','stable_key'].includes(key)).map(([key,value])=>`<div class="kv"><span>${escape(labels[key]||key)}</span><span>${escape(plain(value))}</span></div>`).join('')}${command.expected_version?`<small>基于版本 ${escape(command.expected_version)}</small>`:''}</div>`;
+    }).join('');
     if(item.proposal_type==='preference.change')return `<p>偏好：${escape(p.key)} → ${escape(plain(p.value))}</p><p class="hint">依据：${escape(p.evidence)}</p>`;
     if(item.proposal_type==='change_set')return (p.changes||[]).map(change=>approvalPreview({proposal_type:change.type,payload:change.payload})).join('');
     if(item.proposal_type==='plan.replace')return `<details open><summary>预览路线图 v${escape(p.roadmap?.version||'')}</summary><p>${escape(p.roadmap?.goal||'')}</p><p>${(p.tasks||[]).length} 项任务</p>${(p.roadmap?.timeline?.phases||[]).map(phase=>`<div class="phase"><h3>${escape(phase.title)}</h3><p class="meta">${escape(phase.start_date)} 至 ${escape(phase.end_date)}</p>${(phase.plan?.tasks||[]).map(task=>`<div class="task"><strong>${escape(task.title)}</strong><div class="meta">${escape(task.due_date||'日期待定')}</div></div>`).join('')}</div>`).join('')}<details><summary>预览路线图文章</summary><div class="article">${markdown(p.roadmap?.article||'')}</div></details></details>`;
@@ -414,7 +429,7 @@
     return `<pre>${escape(JSON.stringify(p,null,2))}</pre>`;
   }
   async function decideApproval(id,decision){try{await request('/approvals/'+encodeURIComponent(id)+'/'+decision,{method:'POST',body:'{}'});
-    toast(decision==='accept'?'变更已保存':'已拒绝变更');await Promise.all([loadProfile(),loadPlan(),loadApprovals(),loadMemory()]);}
+    toast(decision==='accept'?'变更已保存':'已拒绝变更');await Promise.all([loadProfile(),loadPlan(),loadApprovals(),loadMemory()]);window.dispatchEvent(new Event('applyops:approval-decided'));}
     catch(error){toast(error.message);await loadApprovals();}}
   function switchTab(tab){state.activeTab=tab;document.querySelectorAll('.tabs button').forEach(button=>button.classList.toggle('active',button.dataset.tab===tab));
     if(tab==='approvals')loadApprovals().catch(error=>toast(error.message));
@@ -435,7 +450,7 @@
     finally{await loadMemory().catch(error=>toast(error.message));}
   };
   ui.conversations.onclick=event=>{const button=event.target.closest('[data-conversation]');if(button)openConversation(button.dataset.conversation).catch(error=>toast(error.message));};
-  $('chat-form').onsubmit=event=>{event.preventDefault();const input=$('chat-input'),message=input.value.trim();if(message){input.value='';sendMessage(message);}};
+  $('chat-form').onsubmit=event=>{event.preventDefault();if(state.running)return;const input=$('chat-input'),message=input.value.trim();if(message){input.value='';sendMessage(message);}};
   $('chat-input').onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}};
   ui.profile.onclick=event=>{if(event.target.id==='edit-profile')editProfile();};
   $('profile-cancel').onclick=()=>$('profile-dialog').close();$('profile-form').onsubmit=saveProfile;

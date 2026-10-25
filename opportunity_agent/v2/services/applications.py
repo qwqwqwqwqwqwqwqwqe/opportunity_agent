@@ -38,6 +38,10 @@ class ApplicationCommandService:
         return approval
 
     async def decide(self, approval_id: str, user_id: str, accept: bool) -> ChangeProposal:
+        from ..core.config import settings
+        if settings.app_mode == "applyops":
+            from ...v3.service import WorkflowService
+            await WorkflowService(self.session).state(user_id, lock=True)
         approval = await self.session.scalar(select(ApprovalRequest).where(
             ApprovalRequest.id == approval_id, ApprovalRequest.user_id == user_id).with_for_update())
         if not approval:
@@ -59,16 +63,39 @@ class ApplicationCommandService:
         return proposal
 
     async def _apply(self, proposal: ChangeProposal) -> None:
+        if proposal.proposal_type == "workflow.commands":
+            from ...v3.contracts import CommandBatch
+            from ...v3.service import WorkflowService
+            await WorkflowService(self.session).execute(proposal.user_id, CommandBatch.model_validate(proposal.payload),
+                                                        source="chat", run_id=proposal.run_id)
+            return
+        from ..core.config import settings
+        if settings.app_mode == "applyops" and proposal.proposal_type == "profile.change":
+            from ...v3.contracts import Command, CommandBatch
+            from ...v3.service import WorkflowService
+            profile = await self.session.scalar(select(Profile).where(Profile.user_id == proposal.user_id))
+            await WorkflowService(self.session).execute(proposal.user_id, CommandBatch(request_id=f"approval:{proposal.id}",
+                commands=[Command(type="profile.change", expected_version=proposal.payload.get("expected_version", profile.version if profile else 1),
+                                  payload=proposal.payload)]), source="chat", run_id=proposal.run_id)
+            return
         if proposal.proposal_type == "change_set":
             changes = proposal.payload.get("changes", [])
             if not changes or not isinstance(changes, list):
                 raise ValueError("change_set must contain changes")
-            for change in changes:
-                await self._apply_one(proposal, change["type"], change["payload"])
+            for index, change in enumerate(changes):
+                if settings.app_mode == "applyops":
+                    from types import SimpleNamespace
+                    await self._apply(SimpleNamespace(id=f"{proposal.id}:{index}", user_id=proposal.user_id,
+                        run_id=proposal.run_id, proposal_type=change["type"], payload=change["payload"]))
+                else:
+                    await self._apply_one(proposal, change["type"], change["payload"])
             return
         await self._apply_one(proposal, proposal.proposal_type, proposal.payload)
 
     async def _apply_one(self, proposal: ChangeProposal, proposal_type: str, body: dict[str, Any]) -> None:
+        from ..core.config import settings
+        if settings.app_mode == "applyops" and proposal_type in {"application.create", "application.change", "task.command", "plan.replace"}:
+            raise ValueError("legacy business writes are disabled in ApplyOps; use /api/v3")
         if proposal_type == "preference.change":
             from .memory import MemoryService
             await MemoryService(self.session).apply_confirmed(proposal.user_id, body, proposal.id)

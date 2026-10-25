@@ -10,8 +10,9 @@ COPY opportunity_agent/__init__.py ./opportunity_agent/__init__.py
 # this project's optional-dependency markers (InvalidVersion: 'dev'). Upgrade
 # the installer before resolving the V2 extras.
 ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG APP_EXTRAS=v2,resume,observability
 RUN python -m pip install --no-cache-dir --index-url "$PIP_INDEX_URL" --upgrade pip \
-    && python -m pip install --no-cache-dir --index-url "$PIP_INDEX_URL" ".[v2,resume,observability]"
+    && python -m pip install --no-cache-dir --index-url "$PIP_INDEX_URL" ".[${APP_EXTRAS}]"
 # Runtime only needs the Python package. Do not copy the entire repository:
 # tests, local data, build artifacts, and temporary files needlessly enlarge
 # the build context and do not belong in the API/worker image.

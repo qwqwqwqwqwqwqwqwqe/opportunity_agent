@@ -6,7 +6,9 @@ def test_legacy_chat_routes_without_workspace():
     from opportunity_agent.v2.api.app import app
     from opportunity_agent.v2.agents.contracts import ExecutionState
     from opportunity_agent.v2.agents.a2a import DomainA2ARequest
-    paths={r.path for r in app.routes}
+    # FastAPI may retain included routers lazily. OpenAPI exposes the actual
+    # public routes across both flat and included routers.
+    paths=set(app.openapi()['paths'])
     assert '/api/v1/applications' in paths
     assert '/api/v1/runs/{run_id}' in paths
     assert not any(p.startswith('/api/v1/'+prefix) for p in paths for prefix in
