@@ -158,6 +158,13 @@ def _decode_html(body: bytes, content_type: str = "") -> str:
     return body.decode("cp1252", errors="replace")
 
 
+class MCPToolError(RuntimeError):
+    def __init__(self, reason):
+        # Keep default traceback/log strings free of untrusted response content.
+        super().__init__('MCP tool returned an error')
+        self.tool_error_reason = reason
+
+
 class TavilyMCP:
     def __init__(self, *, search_limit=2, page_limit=5):
         self.search_limit, self.page_limit = search_limit, page_limit
@@ -212,18 +219,25 @@ class TavilyMCP:
             response = await self.session.call_tool(actual, arguments,
                 read_timeout_seconds=timedelta(seconds=timeout))
         if response.isError:
-            raise RuntimeError("MCP tool returned an error")
+            reason = '\n'.join(block.text for block in response.content if getattr(block,'type','')=='text')
+            if not reason and getattr(response,'structuredContent',None):
+                reason = json.dumps(response.structuredContent,ensure_ascii=True)
+            raise MCPToolError(reason or 'No error description supplied by the MCP server.')
         if getattr(response, "structuredContent", None):
             return response.structuredContent
         text = "\n".join(block.text for block in response.content if getattr(block, "type", "") == "text")
         return json.loads(text)
 
-    async def search(self, query, domains=()):
+    async def search(self, query, domains=(), *, search_depth='basic', max_results=5):
+        if search_depth not in {'basic','advanced'}:
+            raise ValueError('Unsupported Tavily search depth')
+        if type(max_results) is not int or not 1 <= max_results <= 10:
+            raise ValueError('Unsupported Tavily result count')
         if self.search_calls >= self.search_limit:
             raise RuntimeError("Research search budget exhausted")
         self.search_calls += 1
         return await self._call("tavily_search", {"query": query, "include_domains": list(domains),
-                                                  "max_results": 5, "search_depth": "basic"})
+                                                  "max_results": max_results, "search_depth": search_depth})
 
     async def read(self, url, domains):
         try:

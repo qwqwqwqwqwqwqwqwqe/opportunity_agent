@@ -83,7 +83,7 @@ async def v2_page() -> FileResponse:
 
 @app.get("/v3", include_in_schema=False)
 async def v3_page() -> FileResponse:
-    return FileResponse(WEB_DIR / "applyops.html")
+    return FileResponse(WEB_DIR / "applyops.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 def user_out(user: User) -> dict:
@@ -325,18 +325,23 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
             await session.rollback()
             return
         await session.commit()
+        import logging
+        import socket
+        logging.getLogger(__name__).info("run claimed instance=%s run_id=%s request_id=%s",
+                                         socket.gethostname(),run_id,request_id)
         run = await session.get(AgentRun, run_id)
         if not run:
             return
         try:
-            await repo.append_event(run.id, "run_preparing", {})
+            await repo.append_event(run.id, "run_preparing", {}, token)
             await session.commit()
             initial = await _execution_initial(session, repo, run, user_id, conversation_id, message, request_id)
             await session.commit()
         except Exception as exc:
             await session.rollback()
             run = await session.get(AgentRun, run_id)
-            await repo.append_event(run.id, "run_failed", {"error": f"{type(exc).__name__}: {exc}"})
+            await repo.lock_run_execution(run.id, token)
+            await repo.append_event(run.id, "run_failed", {"error": f"{type(exc).__name__}: {exc}"}, token)
             await repo.finalize_run(run, {"error": str(exc)}, "failed", token)
             await session.commit()
             return
@@ -350,7 +355,7 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
                     if item is None:
                         return
                     async with SessionLocal() as event_session:
-                        await Repository(event_session).append_event(run.id, item[0], item[1])
+                        await Repository(event_session).append_event(run.id, item[0], item[1], token)
                         await event_session.commit()
                 except Exception as exc:
                     event_errors.append(exc)
@@ -362,18 +367,21 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
             with span("agent.run", run_id=run.id, user_id=user_id) as run_span:
                 trace_id = format(run_span.get_span_context().trace_id, "032x")
                 run.trace_id = trace_id
-                await repo.append_event(run.id, "trace_started", {"trace_id": trace_id})
+                await repo.append_event(run.id, "trace_started", {"trace_id": trace_id}, token)
                 # Release the event counter row before the asynchronous event
                 # writer starts; otherwise PostgreSQL/SQLite can deadlock.
                 await session.commit()
                 state = await orchestrator.ainvoke(initial, event_queue=event_queue)
             await event_queue.join()
-            await session.refresh(run)
-            if run.execution_token != token:
-                return
+            run = await repo.lock_run_execution(run.id, token)
             run.trace_id = trace_id
             if event_errors:
                 raise RuntimeError(f"could not persist agent events: {event_errors[0]}")
+            if settings.app_mode == "applyops":
+                from ...v3.chat_actions import commit_chat_actions
+                await commit_chat_actions(session, user_id, conversation_id, state)
+                if state.get("chat_approval_decision") or state.get("chat_supersede_approval_ids"):
+                    await repo.append_event(run.id, "answer_snapshot", {"text": state["answer"]}, token)
             # Agent proposals are persisted separately and are the only route to future writes.
             if (state.get("completion") or {}).get("status") in {"PASS", "PARTIAL", "NEED_USER"}:
                 current_message = await session.scalar(select(Message).where(Message.conversation_id == conversation_id,
@@ -398,10 +406,13 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
                         from ...v3.contracts import Command, CommandBatch
                         source_result = await WorkflowService(session).execute(user_id, CommandBatch(
                             request_id=f"{run.id}:source", commands=[Command(type="source.create", payload={
-                                "kind": "chat", "source_ref": run.id, "excerpt": message[:20000]})]), source="chat", run_id=run.id)
+                                "kind": "chat", "source_ref": run.id, "excerpt": "\n".join(state.get("chat_action_messages") or [message])[:20000]})]), source="chat", run_id=run.id)
                         source_id = source_result["changed_resources"][0]["id"]
                         for command in proposal["payload"]["commands"]:
-                            command["evidence_refs"] = [source_id]
+                            # Deletions do not create field observations, so the
+                            # chat transcript source is not command evidence for them.
+                            if command.get("type") not in {"task.delete", "project.delete"}:
+                                command["evidence_refs"] = [source_id]
                         for action in proposal.get("deferred_actions", []):
                             proposal["payload"]["commands"].append({"type": f"{action}.request", "payload": {}})
                     approval = await service.propose(user_id, proposal["type"], proposal["payload"],
@@ -423,7 +434,9 @@ async def execute_run(run_id: str, user_id: str, conversation_id: str, message: 
             await event_queue.join()
             await session.rollback()
             run = await session.get(AgentRun, run_id)
-            if run.execution_token != token:
+            try:
+                run = await repo.lock_run_execution(run.id, token)
+            except VersionConflict:
                 return
             await repo.append_event(run.id, "run_failed", {"error": f"{type(exc).__name__}: {exc}"})
             await repo.finalize_run(run, {"error": str(exc)}, "failed", token)
@@ -465,8 +478,10 @@ async def _execution_initial(session: DBSession, repo: Repository, run: AgentRun
         extra = {}
         if settings.app_mode == "applyops":
             from ...v3.service import WorkflowService
+            from ...v3.chat_actions import load_chat_context
             from ...v3.profile_assistant import load_notice_context, notice_reference
             extra["workflow_snapshot"] = await WorkflowService(session).snapshot(user_id)
+            extra.update(await load_chat_context(session, user_id, conversation_id, run))
             reference = notice_reference(message, context.recent_messages)
             if reference:
                 followup = reference != message
@@ -606,6 +621,10 @@ async def get_run(run_id: str, user: CurrentUser, session: DBSession) -> dict:
                                         'source_status':'cached_evidence'})
     return {"source_progress": source_progress, "id": run.id, "status": run.status, "trace_id": run.trace_id, "answer": state.get("answer", ""),
             "routing_diagnostics": routing or {}, "route_decision": state.get("route_decision"),
+            "intent_recognition": state.get("intent_recognition"),
+            "search_candidates": (state.get('chat_search_pending') or {}).get('candidates', []),
+            "search_result": state.get('chat_search_result'), "search_trace": state.get('chat_search_trace', []),
+            "search_request": state.get('chat_search_request'),
             "approval_ids": state.get("approval_ids", []),
             "conflict_ids": state.get("conflict_ids", []),
             "completion": state.get("completion"), "profile_result": state.get("profile_result"),

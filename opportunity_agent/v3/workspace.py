@@ -100,8 +100,12 @@ async def save_project(service, user_id, command, state, source, run_id):
             expected_version=row.version if row else None, payload=payload, evidence_refs=refs or []), state, source, run_id)
 
     source_id = None
-    if form.source_url or form.notes:
-        result = await service._apply(user_id, Command(type="source.create", payload={"kind": "form",
+    if source == 'chat' and command.evidence_refs:
+        for ref in command.evidence_refs:
+            await service.owned(m.Source, ref, user_id)
+        source_id = command.evidence_refs[0]
+    elif form.source_url or form.notes:
+        result = await service._apply(user_id, Command(type="source.create", payload={"kind": "chat" if source == "chat" else "form",
             "excerpt": "\n".join(filter(None, [form.source_url, form.notes]))}), state, source, run_id)
         source_id = result["id"]
     refs = [source_id] if source_id else []
@@ -164,6 +168,9 @@ def project_cards(snapshot):
             materials = [r for r in snapshot["materials"] if r["requirement_id"] == req["id"] and not r.get("archived")]
             prepared = sum(r["status"] in {"ready", "submitted"} for r in materials)
             uncertain = req["obligation"] == "unknown" or (req["kind"] != "score" and count is None)
+            # This card measures document preparation. An explicitly ready
+            # score report does not assert eligibility; Review still checks the
+            # recorded score/threshold independently.
             done = not uncertain and ((req["kind"] == "score" and score_check(req.get("criteria") or {}, snapshot)[0] is True)
                                      or count is not None and prepared >= count)
             if uncertain:
@@ -174,7 +181,8 @@ def project_cards(snapshot):
             rows.append({"id": req["id"], "title": req.get("title") or req["key"], "kind": req["kind"],
                          "complete": bool(done), "unknown": uncertain, "prepared": prepared, "required": count})
         deadline = offering_deadline(offering)
-        cards.append({"id": app["id"], "university": program.get("university", app["university"]),
+        cards.append({"id": app["id"], "version": app["version"], "revision": snapshot["revision"],
+            "university": program.get("university", app["university"]),
             "name": program.get("name", app["program"]), "cycle": offering.get("cycle") or app["intake"],
             "status": app["status"], "deadline": str(deadline) if deadline else None, "requirements": rows,
             "progress": {"completed": complete, "total": known, "unknown": unknown,

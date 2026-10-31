@@ -50,7 +50,7 @@
         <h4>个人影响与建议</h4><ul>${[...(r.affected_items||[]),...(r.suggested_actions||[]),...(r.conflicts||[]),...(r.missing_information||[])].map(x=>`<li>${esc(x)}</li>`).join('')||'<li>暂无确定结论</li>'}</ul>
         <h4>引用证据</h4>${(r.official_evidence_refs||[]).map(e=>{const page=a.evidence.find(p=>p.id===e.snapshot_id);return `<blockquote>${esc(e.quote)}<p>${page?link(page.url):'来源不可用'} · ${esc(page?time(page.fetched_at):'')}</p></blockquote>`;}).join('')||'<p class="hint">暂无已验证引用</p>'}
         <details><summary>变化片段与核查记录</summary><pre>${esc(JSON.stringify({changes:a.changes,personal_basis:r.personal_basis_refs,tools:a.trace},null,2))}</pre></details>
-        ${notificationId?`<button class="primary" data-explain-notification="${esc(notificationId)}">在画像助手中解释</button>`:''}
+        ${notificationId?`<button class="primary" data-explain-notification="${esc(notificationId)}">在聊天助手中解释</button>`:''}
         ${['unknown','failed'].includes(a.status)?`<button data-monitor-retry="${esc(a.id)}">重新读取资料并分析</button>`:''}`);
     }
     async function render(root,projects){

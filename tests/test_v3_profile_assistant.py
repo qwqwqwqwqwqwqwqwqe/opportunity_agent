@@ -51,8 +51,8 @@ def test_profile_changes_are_proposals_only(message):
 @pytest.mark.parametrize('message,fragment',[
     ('我目前有哪些申请项目？','Example University'),('我还有哪些未完成的待办？','Modify SOP'),
     ('查看日历','2027-01-15'),('查看我的画像','还没有记录'),('你好','个人画像'),
-    ('帮我新增一个待办任务','对应页面修改'),('帮我生成计划','自动排期已停用'),
-    ('把申请项目的托福要求改为105分','对应页面修改')])
+    ('帮我新增一个待办任务','模型服务未配置'),('帮我生成计划','自动排期已停用'),
+    ('把申请项目的托福要求改为105分','对应页面处理')])
 def test_queries_and_business_mutations_do_not_write(message,fragment):
     async def scenario():
         engine,_,_,_,snap=await fixture()
@@ -125,12 +125,18 @@ def test_school_and_program_filters_intersect():
 def test_general_chat_model_has_no_write_tools_and_false_save_claim_falls_back():
     class Client:
         enabled=True
+        generated=False
+        def generate_structured(self,model_type,**kwargs):
+            return model_type.model_validate({'intent':'general_chat','scope':'general'})
         def generate(self,**kwargs):
+            self.generated=True
             assert 'provided_data' in kwargs['user']
             return '已为你保存所有信息'
     async def scenario():
         engine,_,_,_,snap=await fixture()
-        result=await ProfileAssistant(Client()).ainvoke(initial('你好',snap))
+        client=Client()
+        result=await ProfileAssistant(client).ainvoke(initial('你好',snap))
+        assert client.generated and result['completion']['status']=='COMPLETED'
         assert not result['proposals'] and '已为你保存' not in result['answer']
         await engine.dispose()
     asyncio.run(scenario())

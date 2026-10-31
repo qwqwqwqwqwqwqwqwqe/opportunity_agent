@@ -92,10 +92,29 @@ class Repository:
                  lease_expires_at=now + timedelta(seconds=lease_seconds)))
         return result.rowcount == 1
 
-    async def append_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> AgentEvent:
-        sequence = (await self.session.execute(update(AgentRun).where(AgentRun.id == run_id)
+    async def lock_run_execution(self, run_id: str, token: str) -> AgentRun:
+        """Fence all side effects in the caller's short commit transaction."""
+        run = await self.session.scalar(select(AgentRun).where(
+            AgentRun.id == run_id, AgentRun.status == "running",
+            AgentRun.execution_token == token,
+            AgentRun.lease_expires_at > datetime.now(timezone.utc),
+        ).with_for_update().execution_options(populate_existing=True))
+        if run is None:
+            raise VersionConflict("run execution lease was replaced or expired")
+        return run
+
+    async def append_event(self, run_id: str, event_type: str, payload: dict[str, Any],
+                           execution_token: str | None = None) -> AgentEvent:
+        predicate = [AgentRun.id == run_id]
+        if execution_token is not None:
+            predicate.extend([AgentRun.execution_token == execution_token, AgentRun.status == "running",
+                              AgentRun.lease_expires_at > datetime.now(timezone.utc)])
+        sequence = (await self.session.execute(update(AgentRun).where(*predicate)
                     .values(event_sequence=AgentRun.event_sequence + 1)
-                    .returning(AgentRun.event_sequence))).scalar_one()
+                    .returning(AgentRun.event_sequence)
+                    .execution_options(synchronize_session=False))).scalar_one_or_none()
+        if sequence is None:
+            raise VersionConflict("event execution lease was replaced or expired")
         event = AgentEvent(run_id=run_id, sequence=sequence, event_type=event_type, payload=payload)
         self.session.add(event)
         await self.session.flush()

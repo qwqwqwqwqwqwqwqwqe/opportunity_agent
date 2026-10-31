@@ -1,6 +1,8 @@
 """Durable monitor handlers. No network/model calls inside DB transactions."""
 from __future__ import annotations
 import asyncio
+import logging
+import socket
 from contextlib import suppress
 from dataclasses import asdict
 from datetime import timedelta
@@ -140,7 +142,7 @@ async def _check(factory,job_id,token,fetcher):
         job.result = {"check_id":check.id,"status":check.status}
 
 
-async def _analyze(factory,job_id,token,fetcher,agent):
+async def _analyze(factory,job_id,token,fetcher,agent,checkpoint=None):
     async with factory.begin() as session:
         job,check,monitor = await _guard(session,job_id,token)
         analysis = await session.get(mm.MonitorAnalysis,job.scope["analysis_id"])
@@ -188,6 +190,8 @@ async def _analyze(factory,job_id,token,fetcher,agent):
                 if tools.personal_refs:
                     analysis.input_refs = dict(tools.personal_refs)
         raise
+    if checkpoint:
+        await checkpoint("before_commit", job_id, token)
     async with factory.begin() as session:
         await WorkflowService(session).state(user_id,lock=True)
         job,check,monitor = await _guard(session,job_id,token)
@@ -210,7 +214,7 @@ async def _analyze(factory,job_id,token,fetcher,agent):
         job.status,job.result,job.error,job.lease_token,job.lease_until = "completed",{"analysis_id":analysis.id},None,None,None
 
 
-async def process_one(factory,fetcher=None,agent=None):
+async def process_one(factory,fetcher=None,agent=None,checkpoint=None):
     token = uuid4().hex
     eligible = or_(m.Job.status=="queued",(m.Job.status=="running") & (m.Job.lease_until<now()))
     async with factory.begin() as session:
@@ -223,15 +227,21 @@ async def process_one(factory,fetcher=None,agent=None):
         if won.rowcount!=1:
             return True
         identity,kind = job.id,job.type
+        logging.getLogger(__name__).info("monitor job claimed instance=%s job_id=%s check_id=%s type=%s attempt=%s",
+            socket.gethostname(),identity,job.scope.get("check_id"),kind,job.attempt+1)
     renewal = asyncio.create_task(_renew(factory,identity,token))
     try:
+        if checkpoint:
+            await checkpoint("claimed", identity, token)
         if job.attempt>=3:
             raise PageError("RETRY_BUDGET_EXHAUSTED")
         if kind=="monitor.check":
             await _check(factory,identity,token,fetcher or HttpFetcher())
         else:
             provider = agent or PersonalImpactAgent(LLMClient(timeout_seconds=25,retries=0))
-            await _analyze(factory,identity,token,fetcher or HttpFetcher(),provider)
+            await _analyze(factory,identity,token,fetcher or HttpFetcher(),provider,checkpoint)
+        if checkpoint:
+            await checkpoint("committed", identity, token)
     except Exception as exc:
         error = str(exc)[:150] if isinstance(exc,(PageError,ValueError)) else type(exc).__name__
         async with factory.begin() as session:

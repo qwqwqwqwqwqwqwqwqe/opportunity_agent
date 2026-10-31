@@ -222,7 +222,9 @@ def schedule(snapshot: dict, application_ids: list[str] | None = None) -> dict:
 def impact(event: dict) -> str:
     if event["type"] == "task.completed":
         return "review"
-    if event["type"] in {"plan.activated", "plan.drafted", "plan.rejected", "source.created", "notification.read"}:
+    if event["type"] == "task.deleted":
+        return "review" if event["payload"].get("application_id") else "no_op"
+    if event["type"] in {"plan.activated", "plan.drafted", "plan.rejected", "source.created", "notification.read", "project.deleted"}:
         return "no_op"
     fields = set(event["payload"].get("changed_fields", []))
     if event["type"].startswith(("program.", "offering.created")):

@@ -1,0 +1,61 @@
+name: applyops-concurrency
+x-runtime: &runtime
+  build:
+    context: .
+    args: {APP_EXTRAS: "v3,dev,observability"}
+  environment: &env
+    APP_MODE: applyops
+    DATABASE_URL: postgresql+asyncpg://concurrency:concurrency_test_only@postgres:5432/applyops_concurrency
+    JWT_SECRET: concurrency-isolated-test-secret-not-for-production-2026
+    AUTO_CREATE_SCHEMA: "0"
+    MEMORY_VECTOR_ENABLED: "0"
+    OPPORTUNITY_AGENT_DISABLE_DOTENV: "1"
+    DOMAIN_AGENT_TRANSPORT: local
+    LLM_API_KEY: ""
+    MODELSCOPE_API_KEY: ""
+    PYTHONPATH: /app:/harness
+  volumes:
+    - ./tests/concurrency:/harness:ro
+    - ./data/concurrency-control:/control
+  depends_on:
+    migrate: {condition: service_completed_successfully}
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: applyops_concurrency
+      POSTGRES_USER: concurrency
+      POSTGRES_PASSWORD: concurrency_test_only
+    volumes: [concurrency_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U concurrency -d applyops_concurrency"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  migrate:
+    <<: *runtime
+    command: [python, -m, alembic, upgrade, head]
+    depends_on:
+      postgres: {condition: service_healthy}
+  api1:
+    <<: *runtime
+    command: [python, -m, uvicorn, runtime:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:18081:8000"]
+    healthcheck: &health
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://localhost:8000/healthz',timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  api2:
+    <<: *runtime
+    command: [python, -m, uvicorn, runtime:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:18082:8000"]
+    healthcheck: *health
+  worker1:
+    <<: *runtime
+    command: [python, /harness/runtime.py, worker1]
+  worker2:
+    <<: *runtime
+    command: [python, /harness/runtime.py, worker2]
+volumes:
+  concurrency_pg:

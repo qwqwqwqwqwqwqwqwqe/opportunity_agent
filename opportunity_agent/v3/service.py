@@ -9,10 +9,10 @@ import hashlib
 import json
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import func, select, update, text
+from sqlalchemy import delete, func, or_, select, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
-from ..v2.db.models import Application, ApplicationPlan, ApplicationTask, Profile, User, MemoryItem
+from ..v2.db.models import Application, ApplicationPlan, ApplicationTask, TaskProgress, Profile, User, MemoryItem
 from . import models as m
 from .contracts import (ApplicationData, CommandBatch, DependencyData, EventData, MaterialData,
                         OfferingData, ProgramData, RequirementData, SourceData, TaskData)
@@ -43,6 +43,67 @@ ENTITIES = {"program": (m.Program, ProgramData), "offering": (m.Offering, Offeri
             "application": (Application, ApplicationData), "requirement": (m.Requirement, RequirementData),
             "material": (m.Material, MaterialData), "task": (m.Task, TaskData),
             "calendar_event": (m.CalendarEvent, EventData)}
+
+
+async def _delete_task_rows(session, user_id, task_ids):
+    """Remove task-owned edges while leaving historical plan snapshots intact."""
+    task_ids = list(dict.fromkeys(task_ids))
+    if not task_ids:
+        return
+    legacy_ids = (await session.scalars(select(m.Task.legacy_task_id).where(
+        m.Task.user_id == user_id, m.Task.id.in_(task_ids), m.Task.legacy_task_id.is_not(None)))).all()
+    await session.execute(delete(m.Dependency).where(m.Dependency.user_id == user_id,
+        or_(m.Dependency.predecessor_id.in_(task_ids), m.Dependency.successor_id.in_(task_ids))))
+    # Keep old plan items as snapshots; they no longer point at a live task.
+    await session.execute(update(m.PlanItem).where(m.PlanItem.user_id == user_id,
+        m.PlanItem.task_id.in_(task_ids)).values(task_id=None))
+    await session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+        m.Observation.target_type == "task", m.Observation.target_id.in_(task_ids)))
+    await session.execute(delete(m.Notification).where(m.Notification.user_id == user_id,
+        m.Notification.type == "task_due", m.Notification.target_id.in_(task_ids)))
+    if legacy_ids:
+        await session.execute(delete(TaskProgress).where(TaskProgress.task_id.in_(legacy_ids)))
+        await session.execute(delete(ApplicationTask).where(ApplicationTask.id.in_(legacy_ids)))
+    await session.execute(delete(m.Task).where(m.Task.user_id == user_id, m.Task.id.in_(task_ids)))
+
+
+async def _delete_monitor_rows(session, user_id, application_id):
+    """Remove monitor history tied to a deleted application and cancel its jobs."""
+    from . import monitor_models as mm
+
+    monitor = await session.scalar(select(mm.Monitor).where(mm.Monitor.user_id == user_id,
+        mm.Monitor.application_id == application_id).with_for_update())
+    if not monitor:
+        return
+    check_ids = (await session.scalars(select(mm.MonitorCheck.id).where(
+        mm.MonitorCheck.user_id == user_id, mm.MonitorCheck.monitor_id == monitor.id))).all()
+    analysis_ids = (await session.scalars(select(mm.MonitorAnalysis.id).where(
+        mm.MonitorAnalysis.user_id == user_id, mm.MonitorAnalysis.monitor_id == monitor.id))).all()
+    sources = (await session.scalars(select(mm.MonitorSource).where(
+        mm.MonitorSource.user_id == user_id, mm.MonitorSource.monitor_id == monitor.id))).all()
+    source_ids = [row.id for row in sources]
+    jobs = (await session.scalars(select(m.Job).where(m.Job.user_id == user_id,
+        m.Job.type.in_(["monitor.check", "monitor.analyze"]), m.Job.status.in_(["queued", "running"])))).all()
+    for job in jobs:
+        if job.scope.get("check_id") in check_ids or job.scope.get("analysis_id") in analysis_ids:
+            job.status, job.error, job.lease_token, job.lease_until = "cancelled", "project_deleted", None, None
+    if analysis_ids:
+        await session.execute(delete(m.Notification).where(m.Notification.user_id == user_id,
+            m.Notification.analysis_id.in_(analysis_ids)))
+        await session.execute(delete(mm.MonitorAnalysis).where(mm.MonitorAnalysis.user_id == user_id,
+            mm.MonitorAnalysis.id.in_(analysis_ids)))
+    if check_ids:
+        await session.execute(delete(mm.MonitorChange).where(mm.MonitorChange.user_id == user_id,
+            mm.MonitorChange.check_id.in_(check_ids)))
+    await session.execute(delete(mm.MonitorSnapshot).where(mm.MonitorSnapshot.user_id == user_id,
+        mm.MonitorSnapshot.monitor_id == monitor.id))
+    if source_ids:
+        await session.execute(delete(mm.MonitorSource).where(mm.MonitorSource.user_id == user_id,
+            mm.MonitorSource.id.in_(source_ids)))
+    if check_ids:
+        await session.execute(delete(mm.MonitorCheck).where(mm.MonitorCheck.user_id == user_id,
+            mm.MonitorCheck.id.in_(check_ids)))
+    await session.execute(delete(mm.Monitor).where(mm.Monitor.user_id == user_id, mm.Monitor.id == monitor.id))
 
 
 class WorkflowService:
@@ -117,6 +178,7 @@ class WorkflowService:
                     raise WorkflowError("request_id was already used with different content", 409)
                 return old.response
             resources, references = [], {}
+            base_revision = state.planning_revision
             for command in batch.commands:
                 def resolve(value):
                     if isinstance(value, str) and value.startswith("$ref:"):
@@ -130,6 +192,13 @@ class WorkflowService:
                         return [resolve(item) for item in value]
                     return value
                 command = command.model_copy(update={"payload": resolve(command.payload)})
+                if command.type in {'project.save', 'project.delete'} and command.target_id:
+                    # Every preview in this batch refers to the same starting
+                    # snapshot. Earlier commands may bump the revision, but may
+                    # never authorize a draft stale before this transaction.
+                    if command.payload.get('expected_revision') != base_revision:
+                        raise WorkflowError('项目数据已变化，请刷新后重新确认', 409)
+                    command = command.model_copy(update={'payload':{**command.payload, 'expected_revision':state.planning_revision}})
                 result = await self._apply(user_id, command, state, source, run_id)
                 resources.append(result)
                 if command.ref:
@@ -168,6 +237,77 @@ class WorkflowService:
         if command.type == "project.save":
             from .workspace import save_project
             return await save_project(self, user_id, command, state, source, run_id)
+        if command.type in {"project.delete", "task.delete"}:
+            # Older pending chat proposals may include the chat source ref on
+            # every command. It is harmless metadata for deletion and is ignored.
+            if command.type == "task.delete" and command.payload:
+                raise WorkflowError("task delete commands do not accept a payload")
+            if not command.target_id or command.expected_version is None:
+                raise WorkflowError("delete command requires a target and expected_version")
+            if command.type == "task.delete":
+                task = await self.owned(m.Task, command.target_id, user_id, lock=True)
+                if task.version != command.expected_version:
+                    raise WorkflowError("待办已变化，请刷新后重试删除", 409)
+                task_id, title, application_id, version = task.id, task.title, task.application_id, task.version
+                await self._event(user_id, "task.deleted", task, ["deleted"], state, source,
+                    application_id=application_id, extra={"task_id": task_id, "title": title})
+                await _delete_task_rows(self.session, user_id, [task_id])
+                return {"resource_type": "task", "type": "task", "id": task_id,
+                        "version": version, "title": title, "application_id": application_id, "deleted": True}
+
+            application = await self.owned(Application, command.target_id, user_id, lock=True)
+            if application.version != command.expected_version:
+                raise WorkflowError("项目已变化，请刷新后重试删除", 409)
+            expected_revision = command.payload.get("expected_revision")
+            if type(expected_revision) is not int or expected_revision != state.planning_revision:
+                raise WorkflowError("项目及关联数据已变化，请刷新后重新确认删除", 409)
+            application_id, university, program_name, cycle = application.id, application.university, application.program, application.intake
+            offering_id = application.offering_id
+            await _delete_monitor_rows(self.session, user_id, application_id)
+            requirement_ids = (await self.session.scalars(select(m.Requirement.id).where(
+                m.Requirement.user_id == user_id, m.Requirement.application_id == application_id))).all()
+            task_ids = (await self.session.scalars(select(m.Task.id).where(
+                m.Task.user_id == user_id, m.Task.application_id == application_id))).all()
+            await _delete_task_rows(self.session, user_id, task_ids)
+            if requirement_ids:
+                material_ids = (await self.session.scalars(select(m.Material.id).where(
+                    m.Material.user_id == user_id, m.Material.requirement_id.in_(requirement_ids)))).all()
+                if material_ids:
+                    await self.session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+                        m.Observation.target_type == "material", m.Observation.target_id.in_(material_ids)))
+                    await self.session.execute(delete(m.Material).where(m.Material.user_id == user_id,
+                        m.Material.id.in_(material_ids)))
+                await self.session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+                    m.Observation.target_type == "requirement", m.Observation.target_id.in_(requirement_ids)))
+                await self.session.execute(delete(m.Requirement).where(m.Requirement.user_id == user_id,
+                    m.Requirement.id.in_(requirement_ids)))
+            await self.session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+                m.Observation.target_type == "application", m.Observation.target_id == application_id))
+            await self._event(user_id, "project.deleted", application, ["deleted"], state, source,
+                application_id=application_id,
+                extra={"university": university, "program": program_name, "cycle": cycle,
+                       "deleted_tasks": len(task_ids), "deleted_requirements": len(requirement_ids)})
+            await self.session.delete(application)
+            await self.session.flush()
+            if offering_id:
+                offering = await self.session.scalar(select(m.Offering).where(m.Offering.id == offering_id,
+                    m.Offering.user_id == user_id).with_for_update())
+                if offering and not await self.session.scalar(select(Application.id).where(
+                        Application.user_id == user_id, Application.offering_id == offering_id).limit(1)):
+                    program_id = offering.program_id
+                    await self.session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+                        m.Observation.target_type == "offering", m.Observation.target_id == offering.id))
+                    await self.session.delete(offering)
+                    await self.session.flush()
+                    if not await self.session.scalar(select(m.Offering.id).where(
+                            m.Offering.user_id == user_id, m.Offering.program_id == program_id).limit(1)):
+                        await self.session.execute(delete(m.Observation).where(m.Observation.user_id == user_id,
+                            m.Observation.target_type == "program", m.Observation.target_id == program_id))
+                        await self.session.execute(delete(m.Program).where(m.Program.user_id == user_id,
+                            m.Program.id == program_id))
+            return {"resource_type": "project", "type": "project", "id": application_id,
+                    "version": command.expected_version, "university": university,
+                    "program": program_name, "cycle": cycle, "deleted": True}
         kind, _, action = command.type.partition(".")
         if kind in ENTITIES and action in {"create", "update"}:
             model, schema = ENTITIES[kind]

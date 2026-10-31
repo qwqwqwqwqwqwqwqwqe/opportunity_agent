@@ -134,6 +134,13 @@ async def task_command(task_id: str, body: CommandBatch, user: CurrentUser, sess
     return await submit(session, user.id, body)
 
 
+@router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, user: CurrentUser, session: DBSession,
+                      expected_version: int = Query(ge=1), request_id: str = Query(min_length=1, max_length=140)):
+    return await submit(session, user.id, CommandBatch(request_id=request_id, commands=[Command(
+        type="task.delete", target_id=task_id, expected_version=expected_version)]))
+
+
 @router.get("/snapshot")
 async def snapshot(user: CurrentUser, session: DBSession):
     return await WorkflowService(session).snapshot(user.id)
@@ -165,6 +172,15 @@ async def get_project_form(application_id: str, user: CurrentUser, session: DBSe
 async def update_project(body: ProjectForm, application_id: str, user: CurrentUser, session: DBSession):
     return await submit(session, user.id, CommandBatch(request_id=body.request_id, commands=[Command(
         type="project.save", target_id=application_id, payload=body.model_dump(mode="json"))]))
+
+
+@router.delete("/projects/{application_id}")
+async def delete_project(application_id: str, user: CurrentUser, session: DBSession,
+                         expected_version: int = Query(ge=1), expected_revision: int = Query(ge=0),
+                         request_id: str = Query(min_length=1, max_length=140)):
+    return await submit(session, user.id, CommandBatch(request_id=request_id, commands=[Command(
+        type="project.delete", target_id=application_id, expected_version=expected_version,
+        payload={"expected_revision": expected_revision})]))
 
 
 @router.get("/review")

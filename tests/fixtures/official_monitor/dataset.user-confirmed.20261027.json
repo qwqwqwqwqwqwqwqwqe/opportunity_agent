@@ -1,0 +1,4335 @@
+{
+  "schema_version": 1,
+  "label_status": "user_confirmed_heldout_labels_no_per_case_audit",
+  "description": "40 authored page pairs / 80 personal-context cases. Not real official history or human Gold. Templates 1-6 development, 7-8 heldout.",
+  "cases": [
+    {
+      "id": "template-1-deadline-profile1",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-deadline-before.html",
+      "after": "template-1-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-1-deadline-profile2",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-deadline-before.html",
+      "after": "template-1-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-1-language-profile1",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-language-before.html",
+      "after": "template-1-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-1-language-profile2",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-language-before.html",
+      "after": "template-1-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-1-gre-profile1",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-gre-before.html",
+      "after": "template-1-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-1-gre-profile2",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-gre-before.html",
+      "after": "template-1-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-1-noise-profile1",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-noise-before.html",
+      "after": "template-1-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-1-noise-profile2",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-noise-before.html",
+      "after": "template-1-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-1-other-cycle-profile1",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-other-cycle-before.html",
+      "after": "template-1-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-1-other-cycle-profile2",
+      "group": "template-1",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school1.example.edu/admissions",
+      "before": "template-1-other-cycle-before.html",
+      "after": "template-1-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 1",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 1",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-2-deadline-profile1",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-deadline-before.html",
+      "after": "template-2-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-2-deadline-profile2",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-deadline-before.html",
+      "after": "template-2-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-2-language-profile1",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-language-before.html",
+      "after": "template-2-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-2-language-profile2",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-language-before.html",
+      "after": "template-2-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-2-gre-profile1",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-gre-before.html",
+      "after": "template-2-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-2-gre-profile2",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-gre-before.html",
+      "after": "template-2-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-2-noise-profile1",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-noise-before.html",
+      "after": "template-2-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-2-noise-profile2",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-noise-before.html",
+      "after": "template-2-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-2-other-cycle-profile1",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-other-cycle-before.html",
+      "after": "template-2-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-2-other-cycle-profile2",
+      "group": "template-2",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school2.example.edu/admissions",
+      "before": "template-2-other-cycle-before.html",
+      "after": "template-2-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 2",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 2",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-3-deadline-profile1",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-deadline-before.html",
+      "after": "template-3-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-3-deadline-profile2",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-deadline-before.html",
+      "after": "template-3-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-3-language-profile1",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-language-before.html",
+      "after": "template-3-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-3-language-profile2",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-language-before.html",
+      "after": "template-3-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-3-gre-profile1",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-gre-before.html",
+      "after": "template-3-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-3-gre-profile2",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-gre-before.html",
+      "after": "template-3-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-3-noise-profile1",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-noise-before.html",
+      "after": "template-3-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-3-noise-profile2",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-noise-before.html",
+      "after": "template-3-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-3-other-cycle-profile1",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-other-cycle-before.html",
+      "after": "template-3-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-3-other-cycle-profile2",
+      "group": "template-3",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school3.example.edu/admissions",
+      "before": "template-3-other-cycle-before.html",
+      "after": "template-3-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 3",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 3",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-4-deadline-profile1",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-deadline-before.html",
+      "after": "template-4-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-4-deadline-profile2",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-deadline-before.html",
+      "after": "template-4-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-4-language-profile1",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-language-before.html",
+      "after": "template-4-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-4-language-profile2",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-language-before.html",
+      "after": "template-4-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-4-gre-profile1",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-gre-before.html",
+      "after": "template-4-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-4-gre-profile2",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-gre-before.html",
+      "after": "template-4-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-4-noise-profile1",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-noise-before.html",
+      "after": "template-4-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-4-noise-profile2",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-noise-before.html",
+      "after": "template-4-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-4-other-cycle-profile1",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-other-cycle-before.html",
+      "after": "template-4-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-4-other-cycle-profile2",
+      "group": "template-4",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school4.example.edu/admissions",
+      "before": "template-4-other-cycle-before.html",
+      "after": "template-4-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 4",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 4",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-5-deadline-profile1",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-deadline-before.html",
+      "after": "template-5-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-5-deadline-profile2",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-deadline-before.html",
+      "after": "template-5-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-5-language-profile1",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-language-before.html",
+      "after": "template-5-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-5-language-profile2",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-language-before.html",
+      "after": "template-5-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-5-gre-profile1",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-gre-before.html",
+      "after": "template-5-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-5-gre-profile2",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-gre-before.html",
+      "after": "template-5-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-5-noise-profile1",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-noise-before.html",
+      "after": "template-5-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-5-noise-profile2",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-noise-before.html",
+      "after": "template-5-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-5-other-cycle-profile1",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-other-cycle-before.html",
+      "after": "template-5-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-5-other-cycle-profile2",
+      "group": "template-5",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school5.example.edu/admissions",
+      "before": "template-5-other-cycle-before.html",
+      "after": "template-5-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 5",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 5",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-6-deadline-profile1",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-deadline-before.html",
+      "after": "template-6-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-6-deadline-profile2",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-deadline-before.html",
+      "after": "template-6-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-6-language-profile1",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-language-before.html",
+      "after": "template-6-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-6-language-profile2",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-language-before.html",
+      "after": "template-6-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-6-gre-profile1",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-gre-before.html",
+      "after": "template-6-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-6-gre-profile2",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-gre-before.html",
+      "after": "template-6-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-6-noise-profile1",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-noise-before.html",
+      "after": "template-6-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-6-noise-profile2",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-noise-before.html",
+      "after": "template-6-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-6-other-cycle-profile1",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-other-cycle-before.html",
+      "after": "template-6-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-6-other-cycle-profile2",
+      "group": "template-6",
+      "split": "development",
+      "human_review": "pending",
+      "source": "authored_synthetic",
+      "url": "https://school6.example.edu/admissions",
+      "before": "template-6-other-cycle-before.html",
+      "after": "template-6-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 6",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 6",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-7-deadline-profile1",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-deadline-before.html",
+      "after": "template-7-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-7-deadline-profile2",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-deadline-before.html",
+      "after": "template-7-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-7-language-profile1",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-language-before.html",
+      "after": "template-7-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-7-language-profile2",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-language-before.html",
+      "after": "template-7-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-7-gre-profile1",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-gre-before.html",
+      "after": "template-7-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-7-gre-profile2",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-gre-before.html",
+      "after": "template-7-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-7-noise-profile1",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-noise-before.html",
+      "after": "template-7-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-7-noise-profile2",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-noise-before.html",
+      "after": "template-7-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-7-other-cycle-profile1",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-other-cycle-before.html",
+      "after": "template-7-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-7-other-cycle-profile2",
+      "group": "template-7",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school7.example.edu/admissions",
+      "before": "template-7-other-cycle-before.html",
+      "after": "template-7-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 7",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 7",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-8-deadline-profile1",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-deadline-before.html",
+      "after": "template-8-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-8-deadline-profile2",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-deadline-before.html",
+      "after": "template-8-deadline-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "deadline"
+      }
+    },
+    {
+      "id": "template-8-language-profile1",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-language-before.html",
+      "after": "template-8-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-8-language-profile2",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-language-before.html",
+      "after": "template-8-language-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "language"
+      }
+    },
+    {
+      "id": "template-8-gre-profile1",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-gre-before.html",
+      "after": "template-8-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-8-gre-profile2",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-gre-before.html",
+      "after": "template-8-gre-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "AFFECTED",
+        "applicability": "MATCH",
+        "notify": true,
+        "category": "gre"
+      }
+    },
+    {
+      "id": "template-8-noise-profile1",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-noise-before.html",
+      "after": "template-8-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-8-noise-profile2",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-noise-before.html",
+      "after": "template-8-noise-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "MATCH",
+        "notify": false,
+        "category": "noise"
+      }
+    },
+    {
+      "id": "template-8-other-cycle-profile1",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-other-cycle-before.html",
+      "after": "template-8-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 102
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    },
+    {
+      "id": "template-8-other-cycle-profile2",
+      "group": "template-8",
+      "split": "heldout",
+      "human_review": "approved",
+      "source": "authored_synthetic",
+      "url": "https://school8.example.edu/admissions",
+      "before": "template-8-other-cycle-before.html",
+      "after": "template-8-other-cycle-after.html",
+      "context": {
+        "application": {
+          "id": "a1",
+          "version": 1,
+          "university": "School 8",
+          "program": "MSCS",
+          "offering_id": "o1",
+          "status": "preparing"
+        },
+        "offering": {
+          "id": "o1",
+          "cycle": "2027 Fall",
+          "gre_policy": "required",
+          "deadline_date": "2026-12-10",
+          "version": 1
+        },
+        "program": {
+          "id": "p1",
+          "university": "School 8",
+          "name": "MSCS"
+        },
+        "profile": {
+          "toefl_score": 110
+        },
+        "profile_version": 1,
+        "preferences": [],
+        "requirements": [],
+        "materials": [],
+        "tasks": [
+          {
+            "id": "t1",
+            "title": "Prepare GRE",
+            "status": "planned",
+            "due_date": "2026-11-15",
+            "version": 1
+          }
+        ]
+      },
+      "expected": {
+        "impact": "NO_DIRECT_IMPACT",
+        "applicability": "NOT_MATCH",
+        "notify": false,
+        "category": "other-cycle"
+      }
+    }
+  ],
+  "review_provenance": {
+    "type": "user_confirmation_in_conversation",
+    "statement": "用户于2026-10-27在本对话确认：已经审核完了，全部通过，可以继续了",
+    "recorded_at": "2026-10-27T06:22:27.681696+00:00",
+    "original_dataset_sha256": "41fd493b9e4abec07693aae010874f15e652964695bc55f4834f62a45d55b2fa",
+    "per_case_review_notes_provided": false,
+    "independent_review_verified": false
+  }
+}

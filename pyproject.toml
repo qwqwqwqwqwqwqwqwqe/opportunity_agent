@@ -12,6 +12,7 @@ dependencies = ["pydantic>=2.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "httpx>=0.28"]
 v3 = [
+  "mcp>=1,<2",
   "dateparser>=1.2,<2", "fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1",
   "sqlalchemy[asyncio]>=2.0,<3", "asyncpg>=0.29,<1", "aiosqlite>=0.20,<1",
   "alembic>=1.13,<2", "pgvector>=0.3,<1", "PyJWT[crypto]>=2,<3", "argon2-cffi>=23,<26",

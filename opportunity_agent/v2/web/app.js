@@ -207,7 +207,7 @@
     if(role==='user'&&document.body.dataset.mode==='applyops')content=content.replace(/请解释官网变化通知 [a-f0-9]{32}/gi,'请解释这封官网变化通知');
     const article=document.createElement('article'); article.className='message '+(role==='user'?'user':'assistant');
     const rendered=role==='assistant'?markdown(content):`<div class="plain-text">${escape(content)}</div>`;
-    article.innerHTML=`<div class="meta">${role==='user'?'你':document.body.dataset.mode==='applyops'?'画像助手':'助手'}</div>${rendered}`;
+    article.innerHTML=`<div class="meta">${role==='user'?'你':document.body.dataset.mode==='applyops'?'聊天助手':'助手'}</div>${rendered}`;
     ui.messages.append(article); ui.messages.scrollTop=ui.messages.scrollHeight;
     return article;
   }
@@ -267,7 +267,7 @@
         if(state.conversationId!==conversationId)return;
         if(!text){if(draft){draft.remove();draft=null;}return;}
         if(!draft)draft=appendMessage('assistant','');
-        draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'画像助手 · 正在整理回答':'助手 · 正在生成（尚未完成引用校验）'}</div><div class="plain-text">${escape(text)}</div>`;
+        draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'聊天助手 · 正在整理回答':'助手 · 正在生成（尚未完成引用校验）'}</div><div class="plain-text">${escape(text)}</div>`;
         ui.messages.scrollTop=ui.messages.scrollHeight;
       };
       if(initial?.draft_answer)renderDraft(initial.draft_answer);
@@ -309,16 +309,19 @@
             showRunDiagnostics(id,run.failure_report);showSources(run);
             if(run.status==='failed'){renderDraft('');showRunFailure(id,run.error,message);}
             else if(run.answer){
-              if(draft)draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'画像助手':'助手'}</div>${markdown(run.answer)}`;
+              if(draft)draft.innerHTML=`<div class="meta">${document.body.dataset.mode==='applyops'?'聊天助手':'助手'}</div>${markdown(run.answer)}`;
               else appendMessage('assistant',run.answer);
                 ui.messages.scrollTop=ui.messages.scrollHeight;
             }
           }
           await Promise.allSettled([loadProfile(),loadPlan(),loadApprovals(),loadMemory(),loadConflicts(true)]);
+          if(document.body.dataset.mode==='applyops')window.dispatchEvent(new Event('applyops:chat-completed'));
         } catch(error) { terminalStatus='状态获取失败';toast(error.message);ui.steps.textContent=terminalStatus; }
         if(state.activeFollow===owner){state.activeFollow=null;finishRun(terminalStatus);}resolve();
       };
       const labels={run_preparing:'读取会话与相关记忆',run_started:'开始',goal_parse_started:'解析目标与成功标准',
+        intent_parse_started:'理解消息意图',intent_parsed:'意图识别完成',
+        search_started:'正在搜索官网候选链接',website_confirmation_required:'等待确认官网链接',official_page_read:'正在读取已确认官网',search_summarized:'官网证据总结完成',
         goal_parsed:'目标解析完成',routing_started:'选择 Agent',route_selected:'路由完成',agent_started:'Agent 执行中',
         agent_completed:'Agent 完成',completion_checked:'检查结果',repair_round_started:'补查',
         approval_required:'等待确认',profile_conflict:'画像信息待核对',memory_updated:'偏好已保存',

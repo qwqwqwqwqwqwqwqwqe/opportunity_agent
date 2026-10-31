@@ -17,14 +17,18 @@ from opportunity_agent.v3.service import WorkflowError, WorkflowService
 
 
 @pytest.mark.skipif(not os.getenv("APPLYOPS_TEST_DATABASE_URL"),reason="requires dedicated PostgreSQL test database")
-def test_postgres_concurrent_idempotency_and_compare_and_swap():
+@pytest.mark.parametrize('scenario_name',['idempotency','compare_and_swap','monitor_notification'])
+def test_postgres_concurrent_idempotency_and_compare_and_swap(scenario_name):
     async def scenario():
         url=os.environ["APPLYOPS_TEST_DATABASE_URL"]
         if not url.startswith("postgresql+asyncpg://"):
             pytest.fail("APPLYOPS_TEST_DATABASE_URL must use postgresql+asyncpg")
         schema="applyops_test_"+uuid4().hex
         admin=create_async_engine(url)
-        engine=create_async_engine(url,connect_args={"server_settings":{"search_path":schema+",public"}})
+        # Qualify EVERY mapped table explicitly. Keep public only for the vector
+        # extension type; unqualified checkfirst would discover public tables.
+        engine=create_async_engine(url,connect_args={"server_settings":{"search_path":schema+",public"}},
+                                   execution_options={"schema_translate_map":{None:schema}})
         try:
             async with admin.begin() as conn:
                 await conn.execute(text('CREATE SCHEMA "'+schema+'"'))
@@ -40,6 +44,11 @@ def test_postgres_concurrent_idempotency_and_compare_and_swap():
                     return await WorkflowService(session).execute(user.id,body)
             first,second=await asyncio.gather(submit(batch),submit(batch))
             assert first==second
+            if scenario_name=='idempotency':
+                async with factory() as session:
+                    assert await session.scalar(select(func.count()).select_from(m.Program))==1
+                    assert await session.scalar(select(func.count()).select_from(m.CommandReceipt))==1
+                return
             identity=first["changed_resources"][0]["id"]
             changes=[CommandBatch(request_id=str(i),commands=[Command(type="program.update",target_id=identity,
                 expected_version=1,payload={"name":name})]) for i,name in enumerate(["X","Y"])]
@@ -48,6 +57,8 @@ def test_postgres_concurrent_idempotency_and_compare_and_swap():
             async with factory() as session:
                 assert await session.scalar(select(func.count()).select_from(m.Program))==1
                 assert (await session.get(m.Program,identity)).version==2
+            if scenario_name=='compare_and_swap':
+                return
             # The monitor uses the same short user-scoped serialization point.
             # Duplicate requests and competing workers must still emit one message.
             from opportunity_agent.v3.monitor_service import MonitorService

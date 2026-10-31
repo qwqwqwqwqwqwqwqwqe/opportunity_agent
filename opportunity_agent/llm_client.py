@@ -284,6 +284,9 @@ class LLMClient:
         allow_format_fallback: bool = True,
     ) -> T:
         last_error: Exception | None = None
+        # JSON-object gateways require the literal word JSON in the messages,
+        # not merely a response_format field or a serialized schema.
+        system = system + "\nReturn one complete JSON object matching output_schema."
         user = json.dumps({"context": context, "output_schema": model_type.model_json_schema()}, ensure_ascii=False)
         mode, token_budget, attempt = self.structured_output_mode, max_tokens, 0
         retries_left = self.retries

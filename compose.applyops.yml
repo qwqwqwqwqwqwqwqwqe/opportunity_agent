@@ -35,6 +35,8 @@ services:
       LLM_API_BASE: ${LLM_API_BASE:-}
       LLM_MODEL: ${LLM_MODEL:-}
       STRUCTURED_OUTPUT_MODE: ${STRUCTURED_OUTPUT_MODE:-json_object}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      TAVILY_MCP_URL: ${TAVILY_MCP_URL:-https://mcp.tavily.com/mcp/}
     ports: ["127.0.0.1:8001:8000"]
     depends_on:
       postgres: {condition: service_healthy}
