@@ -311,14 +311,34 @@ class ProfileAssistant:
         from .chat_actions import handle_actions
         await emit('intent_parse_started', {'mode':'semantic' if self.client.enabled else 'offline_safe'})
         action = await handle_actions(self.client, initial, self.search_service, emit)
-        if action and action.get('intent_recognition'):
+        parse_error = (action or {}).get('chat_error', {}).get('stage') == 'intent_parse'
+        if parse_error:
+            await emit('intent_parse_failed', action['chat_error'])
+            await emit('completion_checked', action['completion'])
+            await emit('answer_snapshot', {'text':action['answer']})
+            return {**initial, **action, 'schema_version':3, 'events':events,
+                    'results':{'chat_actions':{'draft':None}, 'search':None},
+                    'route_decision':{'mode':'not_routed','agents':[],
+                                      'reason':action['chat_error'].get('code','intent_parse_failed')},
+                    'profile_result':{'conflicts':[], 'decisions':[], 'accepted_facts':[]},
+                    'deferred_actions':[], 'plan_draft_requested':False,
+                    'failures':[action['chat_error'].get('code','intent_parse_failed')]}
+        routed_early = bool((action or {}).pop('routed_early', False))
+        if action and action.get('intent_recognition') and not routed_early:
             await emit('intent_parsed', action['intent_recognition'])
         if action is not None and not action.get('chat_passthrough'):
             action_agent = action.get('chat_handler','intake')
-            action_reason = '官网查询与链接确认' if action_agent == 'search' else '对话新增或修改项目、新增待办或日程'
-            await emit('route_selected', {'mode':'delegate','agents':[action_agent],'reason':action_reason})
-            await emit('agent_started', {'agent':action_agent})
-            await emit('agent_completed', {'agent':action_agent,'status':'complete'})
+            action_reason = ('官网研究 Agent（只读多步）' if action_agent == 'agent' else '官网查询与链接确认'
+                             if action_agent == 'search' else '对话新增或修改项目、新增待办或日程')
+            if not routed_early:
+                # Search routes are announced before the agent runs, in handle_actions.
+                await emit('route_selected', {'mode':'delegate','agents':[action_agent],'reason':action_reason})
+                await emit('agent_started', {'agent':action_agent})
+            completion_status = action.get('completion', {}).get('status')
+            agent_status = {'TEMPORARILY_UNAVAILABLE':'temporarily_unavailable',
+                            'PARTIAL':'partial', 'FAILED':'failed'}.get(completion_status, 'complete')
+            await emit('agent_completed', {'agent':action_agent,'status':agent_status,
+                                           'completion_status':completion_status})
             await emit('completion_checked', action['completion'])
             await emit('answer_snapshot', {'text':action['answer']})
             return {**initial, **action, 'schema_version':3, 'events':events,

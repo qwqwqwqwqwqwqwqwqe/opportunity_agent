@@ -26,6 +26,8 @@ TEXT = 'For Fall 2027 applicants, the application deadline is December 15, 2026.
 @pytest.fixture(autouse=True)
 def no_real_search_backoff(monkeypatch):
     monkeypatch.setattr('opportunity_agent.v3.chat_search.SEARCH_RETRY_BACKOFF',0)
+    # These tests cover the single-step consent flow; the agent loop has its own tests.
+    monkeypatch.setenv('CHAT_AGENT_MODE','single')
 
 
 class Discovery:

@@ -1,0 +1,12 @@
+/* Chat process timeline: intent routing, agent steps and tool calls. */
+.agent-trace{margin:0 20px 8px;padding:8px 12px;background:#f6f8fc;border:1px solid #dde3ef;border-radius:10px;font-size:12px;line-height:1.55}
+.agent-trace summary{font-weight:650;cursor:pointer;color:#33405c}
+.agent-trace ol{list-style:none;margin:6px 0 0;padding:0;max-height:220px;overflow:auto}
+.agent-trace li{position:relative;padding:3px 0 3px 18px;overflow-wrap:anywhere}
+.agent-trace li::before{content:"";position:absolute;left:4px;top:9px;width:7px;height:7px;border-radius:50%;background:#3d9a62}
+.agent-trace li[data-status=pending]::before{background:#8b95ab;animation:agent-trace-pulse 1s ease-in-out infinite}
+.agent-trace li[data-status=wait]::before{background:#d29a2a}
+.agent-trace li[data-status=error]::before{background:#c94a4a}
+.agent-trace li small{display:block;color:#6b7387}
+@keyframes agent-trace-pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.agent-trace li[data-status=pending]::before{animation:none}}

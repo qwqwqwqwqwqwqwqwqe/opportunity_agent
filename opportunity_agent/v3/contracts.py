@@ -59,7 +59,7 @@ class IntakeResult(Contract):
 
 
 class CompletionResult(Contract):
-    status: Literal["COMPLETED", "WAITING_APPROVAL", "NEED_USER", "PARTIAL", "FAILED"]
+    status: Literal["COMPLETED", "WAITING_APPROVAL", "NEED_USER", "PARTIAL", "FAILED", "TEMPORARILY_UNAVAILABLE"]
     missing_outputs: list[str] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list)
 

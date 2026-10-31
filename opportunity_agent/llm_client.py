@@ -355,6 +355,9 @@ def _check_budget(deadline, cancel_event):
 def safe_error_details(exc):
     """Expose error classes/status codes, never provider bodies or credentials."""
     detail = {"code": type(exc).__name__}
+    status = http_status_code(exc)
+    if status is not None:
+        detail["http_status"] = status
     if isinstance(exc, HTTPError):
         detail["http_status"] = exc.code
     elif type(exc).__name__ == "HTTPStatusError":
@@ -369,6 +372,28 @@ def safe_error_details(exc):
     if isinstance(exc, BaseExceptionGroup):
         detail["causes"] = [safe_error_details(e) for e in exc.exceptions[:5]]
     return detail
+
+
+def http_status_code(exc):
+    """Return an HTTP status from an exception or its chained/grouped causes."""
+    seen, pending = set(), [exc]
+    while pending:
+        error = pending.pop()
+        if id(error) in seen:
+            continue
+        seen.add(id(error))
+        status = getattr(error, "code", None)
+        if not isinstance(status, int):
+            status = getattr(getattr(error, "response", None), "status_code", None)
+        if isinstance(status, int):
+            return status
+        if isinstance(error, BaseExceptionGroup):
+            pending.extend(error.exceptions)
+        if error.__cause__ is not None:
+            pending.append(error.__cause__)
+        elif error.__context__ is not None and not error.__suppress_context__:
+            pending.append(error.__context__)
+    return None
 
 
 def _retry_pause(deadline, cancel_event):

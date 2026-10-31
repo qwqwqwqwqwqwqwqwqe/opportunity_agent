@@ -17,7 +17,9 @@ from pydantic import Field
 from .contracts import Contract, EventData, TaskData
 from .workspace import ProjectForm, RequirementEntry
 from .chat_project_updates import ProjectPatch, NeedsProjectInput, build_project_update
-from .chat_search import SearchRequest, ChatSearchService, website_control
+from .chat_search import SearchRequest, ChatSearchService, result as search_response, website_control
+from .chat_agent import ROUTER_HINT, ChatResearchAgent, agent_mode
+from ..llm_client import http_status_code as exception_http_status, safe_error_details
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +366,32 @@ async def handle_actions(client, initial, search_service=None, emit=None):
     base = {"chat_action_draft": None, "chat_action_messages": [], "chat_search_pending":None,"proposals": [], "approval_required": False}
     control = website_control(message)
     async def search_result(request, source='llm'):
-        output = await (search_service or ChatSearchService(client)).handle(request, initial, emit)
+        service = search_service or ChatSearchService(client)
+        # The read-only agent owns new discoveries and its own suspended reads;
+        # a candidate list from single-step search keeps its original flow.
+        if agent_mode() and (request.operation == 'discover' or (search_pending or {}).get('agent_state')):
+            service = ChatResearchAgent(client, service)
+        try:
+            output = await service.handle(request, initial, emit)
+        except Exception as exc:
+            http_status = exception_http_status(exc)
+            rate_limited = http_status == 429
+            agent_tools = getattr(service, 'last_tools', None)
+            trace = getattr(agent_tools, 'trace', [])
+            status = 'TEMPORARILY_UNAVAILABLE' if rate_limited else 'PARTIAL'
+            answer = ('模型服务当前受到限流（HTTP 429），官网查询暂时无法完成。' if rate_limited
+                      else '官网查询暂时无法完成，已保留本次执行诊断。')
+            answer += '\n\n本次没有修改项目、材料、画像或日程。请稍后重试。'
+            output = search_response(answer, status, pending=search_pending,
+                details={'mode':'agent' if isinstance(service, ChatResearchAgent) else 'search',
+                         'failure':{'stage':'search_dispatch', 'code':'model_rate_limited' if rate_limited else 'search_execution_failed',
+                                    'http_status':http_status, 'retryable':rate_limited,
+                                    'details':safe_error_details(exc)},
+                         'search_request':request.model_dump(mode='json', exclude={'confirmation_quote'}),
+                         'tavily_results':getattr(agent_tools, 'search_results', [])},
+                trace=trace)
+            output['completion'] = {'status':status, 'missing_outputs':[],
+                                    'reasons':['model_rate_limited' if rate_limited else 'search_execution_failed']}
         output['chat_search_request'] = request.model_dump(mode='json',exclude={'confirmation_quote'})
         output['intent_recognition']['source'] = source
         # A URL confirmation is independent of an existing business proposal.
@@ -408,7 +435,8 @@ async def handle_actions(client, initial, search_service=None, emit=None):
         return None
     snapshot = initial["workflow_snapshot"]
     try:
-        understood = await asyncio.wait_for(asyncio.to_thread(client.generate_structured, ChatUnderstanding, system=SYSTEM,
+        understood = await asyncio.wait_for(asyncio.to_thread(client.generate_structured, ChatUnderstanding,
+            system=SYSTEM + (ROUTER_HINT if agent_mode() else ''),
             context={"query": message, "previous_draft": previous, "recent_messages": initial.get("recent_messages", [])[-8:],
                      "pending_search":search_pending,
                      "today": snapshot["today"], "timezone": snapshot.get("availability", {}).get("timezone", "Asia/Shanghai"),
@@ -416,27 +444,78 @@ async def handle_actions(client, initial, search_service=None, emit=None):
                      "existing_data": {k: snapshot.get(k, []) for k in ("applications", "offerings", "requirements", "materials", "tasks", "calendar_events")}},
             max_tokens=3600), 35)
         understood = ChatUnderstanding.model_validate(understood)
-        recognition = {"source":"llm", "intent":understood.intent, "scope":understood.scope, "reason":understood.reason}
         if understood.intent == 'search':
             if understood.projects or understood.todos or understood.events or understood.deletions or understood.search is None:
                 raise ValueError('search must not carry business commands')
-            return await search_result(understood.search)
-        if understood.search is not None:
+        elif understood.search is not None:
             raise ValueError('non-search intent must not include web operations')
         if understood.intent in {"query", "profile_update", "notice_explanation", "general_chat"}:
             if understood.projects or understood.todos or understood.events or understood.deletions:
                 raise ValueError("non-action intent must not contain business commands")
-            return {"chat_passthrough":True, "intent_recognition":recognition}
-        if understood.intent in {"clarify", "unsupported_action"}:
-            return {**base, "intent_recognition":recognition, "chat_action_draft":previous, "approval_ids":pending,
+    except Exception as exc:
+        if exception_http_status(exc) == 429:
+            return {**base, "chat_action_draft":previous, "approval_ids":pending,
+                    "chat_search_pending":search_pending,
                     "chat_action_messages":initial.get("chat_action_messages", []),
-                    "answer":"\n".join(understood.questions) or "请说明要查询已有数据、更新画像，还是新增项目、待办或日程。",
-                    "completion":{"status":"NEED_USER", "missing_outputs":understood.questions, "reasons":[]}}
+                    "answer":"模型服务当前受到限流（HTTP 429），暂时无法识别本次请求。没有执行官网搜索或修改业务数据，请稍后重试。",
+                    "intent_recognition":{"source":"llm", "intent":"unknown", "scope":"general", "reason":"intent_model_rate_limited"},
+                    "completion":{"status":"TEMPORARILY_UNAVAILABLE", "missing_outputs":[], "reasons":["model_rate_limited"]},
+                    "chat_error":{"stage":"intent_parse", "code":"model_rate_limited", "http_status":429,
+                                  "retryable":True, "details":safe_error_details(exc)}}
+        return {**base, "chat_action_draft": previous, "approval_ids":pending,
+                "chat_search_pending":search_pending,
+                "chat_action_messages":initial.get("chat_action_messages", []),
+                "answer": "这次未能解析请求意图，没有执行官网搜索或修改任何数据。请重试，或重新说明要查询的信息、更新的画像或项目操作。",
+                "intent_recognition":{"source":"llm", "intent":"unknown", "scope":"general", "reason":"intent_parse_failed"},
+                "completion": {"status": "NEED_USER", "missing_outputs": [], "reasons": ["intent_parse_failed"]},
+                "chat_error":{"stage":"intent_parse", "code":"intent_parse_failed", "retryable":False,
+                              "details":safe_error_details(exc)}}
+
+    recognition = {"source":"llm", "intent":understood.intent, "scope":understood.scope, "reason":understood.reason}
+    if understood.intent == 'search':
+        if emit:
+            # Report routing before the (possibly long) search/agent run starts.
+            handler = 'agent' if agent_mode() else 'search'
+            await emit('intent_parsed', recognition)
+            await emit('route_selected', {'mode':'delegate', 'agents':[handler],
+                'reason':'官网研究 Agent（只读多步）' if handler == 'agent' else '官网查询与链接确认',
+                'search_keywords':understood.search.search_keywords,
+                'target':{k:getattr(understood.search, k) for k in ('university','program','cycle')}})
+            await emit('agent_started', {'agent':handler})
+        try:
+            output = await search_result(understood.search)
+            output['routed_early'] = bool(emit)
+            return output
+        except Exception as exc:
+            # A later search/agent failure is not an intent-parse failure.
+            # ChatResearchAgent normally converts failures with its full trace;
+            # keep this guard for errors raised before its run context exists.
+            http_status = exception_http_status(exc)
+            rate_limited = http_status == 429
+            status = 'TEMPORARILY_UNAVAILABLE' if rate_limited else 'PARTIAL'
+            answer = ('模型服务当前受到限流（HTTP 429），官网查询暂时无法完成。' if rate_limited
+                      else '官网查询暂时无法完成，未生成未经核实的官网结论。')
+            answer += '\n\n没有修改项目、材料、画像或日程。请稍后重试。'
+            return {**base, 'answer':answer, 'chat_handler':'agent' if agent_mode() else 'search', 'routed_early':bool(emit),
+                    'chat_search_request':understood.search.model_dump(mode='json', exclude={'confirmation_quote'}),
+                    'chat_search_result':{'failure':{'stage':'search_agent', 'code':'model_rate_limited' if rate_limited else 'search_execution_failed',
+                        'http_status':http_status, 'retryable':rate_limited, 'details':safe_error_details(exc)}},
+                    'chat_search_trace':[], 'intent_recognition':{**recognition, 'reason':'官网研究暂时不可用'},
+                    'completion':{'status':status, 'missing_outputs':[],
+                                  'reasons':['model_rate_limited' if rate_limited else 'search_execution_failed']}}
+    if understood.intent in {"query", "profile_update", "notice_explanation", "general_chat"}:
+        return {"chat_passthrough":True, "intent_recognition":recognition}
+    if understood.intent in {"clarify", "unsupported_action"}:
+        return {**base, "intent_recognition":recognition, "chat_action_draft":previous, "approval_ids":pending,
+                "chat_action_messages":initial.get("chat_action_messages", []),
+                "answer":"\n".join(understood.questions) or "请说明要查询已有数据、更新画像，还是新增项目、待办或日程。",
+                "completion":{"status":"NEED_USER", "missing_outputs":understood.questions, "reasons":[]}}
+    try:
         draft = ChatDraft.model_validate(understood.model_dump(exclude={"intent", "scope", "reason", "search"}))
         commands, lines, questions = build_commands(draft, snapshot, initial["request_id"])
     except Exception:
         return {**base, "chat_action_draft": previous, "approval_ids":pending, "chat_action_messages":initial.get("chat_action_messages", []), "answer": "这次未能可靠解析请求或生成操作草稿，没有新增、修改或删除任何数据。请重试，或重新说明要查询的信息、更新的画像或项目操作。",
-                "intent_recognition":{"source":"llm", "intent":"unknown", "scope":"general", "reason":"invalid_or_unavailable"},
+                "intent_recognition":recognition,
                 "completion": {"status": "NEED_USER", "missing_outputs": [], "reasons": ["invalid_action_draft"]}}
     if not commands and not questions:
         questions = ["请补充要新增、修改或删除的项目/待办信息，或提供要创建的日程；本次没有生成可提交的草稿。"]
@@ -479,7 +558,8 @@ async def load_chat_context(session, user_id, conversation_id, run):
         ApprovalRequest.id.in_(approval_ids), ApprovalRequest.status == "pending",
         ChangeProposal.proposal_type == "workflow.commands"))).all() if previous else []
     return {"chat_action_draft": state.get("chat_action_draft"), "chat_action_messages": state.get("chat_action_messages", []),
-            "chat_pending_approval_ids": list(approvals), 'chat_search_pending':state.get('chat_search_pending')}
+            "chat_pending_approval_ids": list(approvals), 'chat_search_pending':state.get('chat_search_pending'),
+            'chat_evidence':state.get('chat_evidence')}
 
 
 async def commit_chat_actions(session, user_id, conversation_id, state):

@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from pydantic import Field, StringConstraints, model_validator
 from ..official_research import OfficialDomainRegistry, classify_program_page, program_identity
+from ..llm_client import http_status_code, safe_error_details
 from .contracts import Contract
 from .monitor_web import HttpFetcher, safe_url
 
@@ -389,6 +390,8 @@ class ChatSearchService:
         trace = [{'tool':'read_official_page','url':url,'status':'started','candidate_id':selected['id']}]
         if emit:
             await emit('official_page_read', {'url':url,'status':'started'})
+        page, evidence, truncated = None, [], False
+        summary_trace = {'tool':'summarize_official_page','status':'started'}
         try:
             page = await self.fetcher.fetch(url, [host])
             if page is None or not page.blocks:
@@ -407,6 +410,7 @@ class ChatSearchService:
                 raise ValueError('no_readable_evidence')
             truncated = len(evidence) < len(page.blocks)
             trace[0].update(status='completed', content_hash=page.content_hash, block_count=len(evidence), truncated=truncated)
+            trace.append(summary_trace)
             summary = await asyncio.wait_for(asyncio.to_thread(self.client.generate_structured, SearchSummary,
                 system=SUMMARY_SYSTEM, context={'question':pending['question'],'search_query':pending.get('search_keywords') or pending['query'],'target':{'university':pending.get('university'),
                     'program':pending.get('program'),'cycle':pending.get('cycle')}, 'url':url,
@@ -434,11 +438,31 @@ class ChatSearchService:
                        'url':url,'candidate_id':selected['id'],'fetched_at':fetched,
                        'content_hash':page.content_hash,'evidence_blocks':evidence,'summary':summary.model_dump(mode='json'),
                        'truncated':truncated,'confirmation_message':initial['message']}
-            trace.append({'tool':'summarize_official_page','status':'completed','claim_count':len(summary.claims)})
+            summary_trace.update(status='completed', claim_count=len(summary.claims))
             if emit:
                 await emit('search_summarized', {'url':url,'claim_count':len(summary.claims)})
             return result('\n\n'.join(lines), 'PARTIAL' if missing else 'COMPLETED', details=details, trace=trace)
         except Exception as exc:
-            trace.append({'tool':'official_page_answer','status':'failed','error_type':type(exc).__name__})
-            return result('已收到链接确认，但本次网页读取或证据总结未成功；没有用搜索摘要替代官网正文。可再次确认该链接重试，或让我重新查找。',
-                          'PARTIAL', pending=pending, trace=trace)
+            if trace[0]['status'] == 'started':
+                trace[0].update(status='failed', error=safe_error_details(exc))
+            elif summary_trace in trace and summary_trace['status'] == 'started':
+                summary_trace.update(status='failed', error=safe_error_details(exc))
+            http_status = http_status_code(exc)
+            rate_limited = http_status == 429
+            status = 'TEMPORARILY_UNAVAILABLE' if rate_limited else 'PARTIAL'
+            failure = {'stage':'official_page_summary' if page and evidence else 'official_page_read',
+                       'code':'model_rate_limited' if rate_limited else 'official_page_processing_failed',
+                       'http_status':http_status, 'retryable':rate_limited,
+                       'details':safe_error_details(exc)}
+            answer = ('模型服务当前受到限流（HTTP 429），官网页面已读取，但总结暂时无法完成。'
+                      if rate_limited else '已收到链接确认，但网页读取或证据总结未成功。')
+            answer += '本次没有用搜索摘要或模型记忆代替官网正文，也没有修改申请数据。可稍后重新确认该链接重试。'
+            fetched_at = page.fetched_at.isoformat() if page else None
+            details = {'query':pending.get('query'), 'search_keywords':pending.get('search_keywords') or pending.get('query'),
+                       'url':url, 'candidate_id':selected['id'], 'fetched_at':fetched_at,
+                       'content_hash':page.content_hash if page else None, 'evidence_blocks':evidence,
+                       'truncated':truncated, 'failure':failure}
+            output = result(answer, status, pending=pending, details=details, trace=trace)
+            output['completion'] = {'status':status, 'missing_outputs':[],
+                                    'reasons':['model_rate_limited' if rate_limited else 'official_page_processing_failed']}
+            return output

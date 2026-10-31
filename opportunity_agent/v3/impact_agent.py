@@ -1,9 +1,9 @@
 """One bounded, read-only tool-using personal-impact agent."""
 from __future__ import annotations
-import asyncio
 from datetime import date
 import json
 import time
+from .agent_runtime import run_loop
 from .monitor_contracts import AgentAction, ImpactResult
 
 
@@ -164,33 +164,6 @@ class PersonalImpactAgent:
         initial += [("read_official_page",{"snapshot_id":i}) for i in sorted(tools.configured_ids)]
         for name,args in initial:
             context["observations"].append({"tool":name,"arguments":args,"result":await tools.call(name,args)})
-        invalid = 0
-        for _ in range(6):
-            if time.monotonic() >= deadline:
-                raise TimeoutError("ANALYSIS_BUDGET_EXHAUSTED")
-            try:
-                diagnostics = []
-                started = time.monotonic()
-                entry = {"model_call":True,"status":"failed","model":getattr(self.client,"model","test"),"diagnostics":diagnostics}
-                tools.trace.append(entry)
-                try:
-                    action = await asyncio.wait_for(asyncio.to_thread(self.client.generate_structured, AgentAction,
-                        system=SYSTEM, context=context, temperature=0, max_tokens=3000, deadline=deadline,
-                        diagnostics=diagnostics,allow_format_fallback=False),
-                        min(25, max(.01,deadline-time.monotonic())))
-                    entry["status"] = "ok"
-                finally:
-                    entry["latency_ms"] = int((time.monotonic()-started)*1000)
-                if action.tool == "finish":
-                    if action.result is None:
-                        raise ValueError("MISSING_RESULT")
-                    eligible = tools.validate(action.result)
-                    return action.result, eligible
-                value = await tools.call(action.tool, action.arguments)
-                context["observations"].append({"tool":action.tool,"arguments":action.arguments,"result":value})
-            except (ValueError, KeyError, TypeError) as exc:
-                invalid += 1
-                if invalid>1:
-                    raise
-                context["observations"].append({"error":str(exc)[:150]})
-        raise TimeoutError("MODEL_CALL_BUDGET_EXHAUSTED")
+        outcome = await run_loop(self.client, tools, system=SYSTEM, context=context, action_model=AgentAction,
+                                 steps=6, deadline=deadline)
+        return outcome.result, outcome.eligible

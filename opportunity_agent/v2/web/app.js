@@ -137,7 +137,7 @@
     }
   }
   function runLabel(run){return run.status==='failed'?'执行失败':
-    ({PARTIAL:'部分完成',NEED_USER:'需要补充信息',FAIL:'任务未完成'}[run.completion?.status]||
+    ({PARTIAL:'部分完成',NEED_USER:'需要补充信息',FAIL:'任务未完成',TEMPORARILY_UNAVAILABLE:'服务暂时不可用'}[run.completion?.status]||
       (run.status==='completed'?'已完成':'正在处理'));}
   function showRunDiagnostics(id,report){
     const target=$('run-diagnostics');
@@ -229,6 +229,48 @@
       showRunInfo(run.run_id);
       await followRun(run.run_id,message,conversationId);
     } catch(error) { toast(error.message); finishRun(); }
+  }
+  // Process timeline: routing result, each agent step and its tool call.
+  // Payloads carry tool names, arguments and counts only, never profile values.
+  const TRACE_EVENTS=new Set(['intent_parsed','intent_parse_failed','route_selected','search_started','official_page_read',
+    'website_confirmation_required','agent_thinking','agent_step','agent_rejected','agent_finished','completion_checked']);
+  const INTENTS={actions:'业务操作',profile_update:'画像更新',query:'查询已有数据',search:'官网查询',
+    notice_explanation:'解释通知',general_chat:'普通聊天',clarify:'需要澄清',unsupported_action:'暂不支持',unknown:'未识别'};
+  const TOOLS={search_official:'搜索官网',read_official_page:'读取官网页面',list_links:'列出页面链接',
+    get_user_facts:'读取画像',get_applications:'读取申请项目',get_materials:'读取材料要求'};
+  function traceBox(reset=false) {
+    let box=$('agent-trace');
+    if(!box){box=document.createElement('details');box.id='agent-trace';box.className='agent-trace';box.open=true;
+      box.innerHTML='<summary>执行过程</summary><ol></ol>';ui.steps.before(box);}
+    if(reset){box.querySelector('ol').innerHTML='';box.querySelector('summary').textContent='执行过程';box.hidden=true;}
+    return box;
+  }
+  function traceAdd(name,d) {
+    const box=traceBox(),list=box.querySelector('ol');
+    const args=o=>Object.entries(o||{}).map(([k,v])=>`${k}=${Array.isArray(v)?v.join(','):v}`).join('，');
+    const small=t=>t?`<small>${escape(t)}</small>`:'';
+    let head='',detail='',status='ok',key='';
+    if(name==='intent_parsed'){head=`意图路由：${INTENTS[d.intent]||d.intent||'未知'}`+(d.scope&&d.scope!=='general'?` · ${d.scope}`:'');detail=d.reason;}
+    else if(name==='intent_parse_failed'){head='意图识别失败';detail=d.code;status='error';}
+    else if(name==='route_selected'){head=`分派给：${(d.agents||[]).join('、')||'直接回复'}`;
+      detail=[d.reason,d.search_keywords&&'检索词：'+d.search_keywords,
+        d.target&&Object.values(d.target).some(Boolean)&&'目标：'+Object.values(d.target).filter(Boolean).join(' · ')].filter(Boolean).join('；');}
+    else if(name==='search_started'){head='Tavily 搜索';detail=d.query+(d.attempt>1?`（第 ${d.attempt} 次尝试）`:'');}
+    else if(name==='official_page_read'){head='抓取页面';detail=d.url;}
+    else if(name==='website_confirmation_required'){head='等待你确认网站';status='wait';}
+    else if(name==='agent_thinking'){key='step-'+d.step;head=`第 ${d.step}/${d.max_steps} 步 · 模型决策中…`;status='pending';}
+    else if(name==='agent_step'){key='step-'+d.step;head=`第 ${d.step} 步 · ${TOOLS[d.tool]||d.tool}`;
+      detail=[args(d.arguments),d.summary&&'→ '+d.summary].filter(Boolean).join(' ');
+      status=d.status==='ok'?'ok':d.status==='suspended'?'wait':'error';}
+    else if(name==='agent_rejected'){key='step-'+d.step;head=`第 ${d.step} 步 · 动作被拒绝，交回模型修正`;detail=d.error;status='error';}
+    else if(name==='agent_finished'){const k=d.kinds||{};head=`第 ${d.step} 步 · 生成回答，引用校验通过`;
+      detail=`${d.claims} 条结论（官网事实 ${k.official_fact||0} · 个人匹配 ${k.personal_match||0} · 一般建议 ${k.general_advice||0}）`+(d.missing?`，${d.missing} 项未确认`:'');}
+    else if(name==='completion_checked'){head=`结果检查：${d.status||''}`;status=['COMPLETED','PASS','WAITING_APPROVAL'].includes(d.status)?'ok':'wait';}
+    let li=key?list.querySelector(`[data-key="${CSS.escape(key)}"]`):null;
+    if(!li){li=document.createElement('li');if(key)li.dataset.key=key;list.append(li);}
+    li.dataset.status=status;li.innerHTML=`<span>${escape(head)}</span>${small(detail)}`;
+    box.hidden=false;box.querySelector('summary').textContent=`执行过程 · ${list.children.length} 条`;
+    list.scrollTop=list.scrollHeight;
   }
   function finishRun(status='准备就绪') { state.running=false; $('chat-form').querySelector('button').disabled=false; $('run-status').textContent=status; }
   function followRun(id,message,conversationId,initial=null) {
@@ -325,7 +367,10 @@
         goal_parsed:'目标解析完成',routing_started:'选择 Agent',route_selected:'路由完成',agent_started:'Agent 执行中',
         agent_completed:'Agent 完成',completion_checked:'检查结果',repair_round_started:'补查',
         approval_required:'等待确认',profile_conflict:'画像信息待核对',memory_updated:'偏好已保存',
-        synthesis_started:'正在组织语言',synthesizer_fallback:'正在生成已有结果摘要',final_answer:'回答已生成'};
+        synthesis_started:'正在组织语言',synthesizer_fallback:'正在生成已有结果摘要',final_answer:'回答已生成',
+        intent_parse_failed:'意图识别失败',agent_thinking:'Agent 决策中',agent_step:'Agent 调用工具',
+        agent_rejected:'Agent 动作被拒绝',agent_finished:'Agent 回答通过引用校验'};
+      if(!cursor)traceBox(true);
       for(const name of [...Object.keys(labels),'run_diagnostics','research_progress','answer_snapshot','answer_reset','trace_started','run_completed','run_failed']) stream.addEventListener(name,event=>{
         if(done)return;
         let envelope;try{envelope=JSON.parse(event.data||'{}');}catch{return;}
@@ -339,6 +384,7 @@
         if(name==='run_diagnostics'){showRunDiagnostics(id,data);return;}
         if(name==='answer_snapshot'){renderDraft(data.text||'');return;}
         if(name==='answer_reset'){renderDraft('');return;}
+        if(TRACE_EVENTS.has(name))traceAdd(name,data);
         stage=name==='research_progress'?researchStage(data):
           (labels[name]||name)+(data.agent?' · '+data.agent:'')+
           (name==='repair_round_started'?` · 第 ${Number(data.round_id||0)+1} 轮`:'')+

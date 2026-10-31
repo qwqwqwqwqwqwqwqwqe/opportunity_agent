@@ -619,17 +619,22 @@ async def get_run(run_id: str, user: CurrentUser, session: DBSession) -> dict:
                 seen_sources.add(url)
                 source_progress.append({'stage':'source','url':url,'title':evidence.get('title',''),
                                         'source_status':'cached_evidence'})
+    pending_candidates = (state.get('chat_search_pending') or {}).get('candidates', [])
+    search_result = state.get('chat_search_result') or {}
+    if not pending_candidates:
+        pending_candidates = [candidate for item in search_result.get('tavily_results', [])
+                              for candidate in item.get('candidates', [])]
     return {"source_progress": source_progress, "id": run.id, "status": run.status, "trace_id": run.trace_id, "answer": state.get("answer", ""),
             "routing_diagnostics": routing or {}, "route_decision": state.get("route_decision"),
             "intent_recognition": state.get("intent_recognition"),
-            "search_candidates": (state.get('chat_search_pending') or {}).get('candidates', []),
-            "search_result": state.get('chat_search_result'), "search_trace": state.get('chat_search_trace', []),
+            "search_candidates": pending_candidates,
+            "search_result": search_result or None, "search_trace": state.get('chat_search_trace', []),
             "search_request": state.get('chat_search_request'),
             "approval_ids": state.get("approval_ids", []),
             "conflict_ids": state.get("conflict_ids", []),
             "completion": state.get("completion"), "profile_result": state.get("profile_result"),
             "research_result": state.get("research_result"), "plan_result": state.get("plan_result"),
-            "error": state.get("error"), "failure_report": failure_report,
+            "error": state.get("error"), "chat_error":state.get("chat_error"), "failure_report": failure_report,
             "created_at": run.created_at, "last_event_sequence": run.event_sequence,
             "progress": {"event_type": progress.event_type, **progress.payload} if progress else {},
             "draft_answer": latest_draft.payload.get("text", "") if latest_draft and latest_draft.event_type == "answer_snapshot" and run.status == "running" else ""}

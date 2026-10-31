@@ -37,6 +37,7 @@ services:
       STRUCTURED_OUTPUT_MODE: ${STRUCTURED_OUTPUT_MODE:-json_object}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       TAVILY_MCP_URL: ${TAVILY_MCP_URL:-https://mcp.tavily.com/mcp/}
+      CHAT_AGENT_MODE: ${CHAT_AGENT_MODE:-single}
     ports: ["127.0.0.1:8001:8000"]
     depends_on:
       postgres: {condition: service_healthy}
